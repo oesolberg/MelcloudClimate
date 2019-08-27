@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using HomeSeerAPI;
 using HSPI_MelcloudClimate.Libraries;
 using HSPI_MelcloudClimate.Libraries.Logs;
+using HSPI_MelcloudClimate.Libraries.Settings;
 
 namespace HSPI_MelcloudClimate
 {
@@ -28,6 +29,7 @@ namespace HSPI_MelcloudClimate
         private RestClient client = new RestClient("https://app.melcloud.com/Mitsubishi.Wifi.Client/");
         private Log Log;
         public static bool bShutDown = false;
+        private Setting _settings;
 
         public Log.LogType LOG_TYPE_INFO { get; private set; }
         public Log.LogType LOG_TYPE_ERROR { get; private set; }
@@ -93,8 +95,9 @@ namespace HSPI_MelcloudClimate
             Log = new Log(HS);
 
             Log.Write("Starting plugin", LOG_TYPE_INFO);
-       
-            try
+            _settings = new Setting(HS);
+			_settings.DoInifileTemplateIfFileMissing();
+			try
             {
                Login(); //Login to the system
                Task.Run((Action)RunApplication);
@@ -131,7 +134,11 @@ namespace HSPI_MelcloudClimate
             ContextKey = null; //Reset context key
             IRestResponse response = null; //Reset response if it would be set
 
-            try
+
+            var melcloudEmail = _settings.GetEmail();
+            var melcloudPassword = _settings.GetPassword();
+
+			try
             {
                 var request = new RestRequest("Login/ClientLogin", Method.POST);
                 request.AddHeader("Accept", "application/json");
