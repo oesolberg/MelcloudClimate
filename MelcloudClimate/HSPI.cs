@@ -90,8 +90,6 @@ namespace HSPI_MelcloudClimate
         public override string InitIO(string port)
         {
 
-            
-
             Log = new Log(HS);
 
             Log.Write("Starting plugin", LOG_TYPE_INFO);
@@ -136,6 +134,7 @@ namespace HSPI_MelcloudClimate
 
 
             var melcloudEmail = _settings.GetEmail();
+
             var melcloudPassword = _settings.GetPassword();
 
 			try
@@ -144,7 +143,7 @@ namespace HSPI_MelcloudClimate
                 request.AddHeader("Accept", "application/json");
                 request.RequestFormat = DataFormat.Json;
                 request.Parameters.Clear();
-                request.AddJsonBody(new { Email = MelcloudEmail, Password = MelcloudPassword, Language = 0, AppVersion = "1.16.1.2", Persist = "false", CaptchaResponse = "" });
+                request.AddJsonBody(new { Email = melcloudEmail, Password = melcloudPassword, Language = 0, AppVersion = "1.16.1.2", Persist = "false", CaptchaResponse = "" });
 
                 response = client.Execute(request);
                 
