@@ -129,8 +129,9 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
                 childDevice.set_Device_Type_String(_hs, Name + GetName() + "child");
                 childDevice.set_Relationship(_hs, Enums.eRelationship.Child);
                 childDevice.set_Address(_hs, GetDeviceAddressName() );
+                childDevice.AssociatedDevice_Add(_hs, ParentId);
 
-                int dvRef = childDevice.get_Ref(_hs);
+				int dvRef = childDevice.get_Ref(_hs);
 
                 var rootDevice = (DeviceClass) _hs.GetDeviceByRef(ParentId);
                 rootDevice.AssociatedDevice_Add(_hs, dvRef); //Then associated that child reference with the root.

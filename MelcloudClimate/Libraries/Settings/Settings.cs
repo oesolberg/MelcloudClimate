@@ -52,5 +52,12 @@ namespace HSPI_MelcloudClimate.Libraries.Settings
 			var password = _hs.GetINISetting(UserSection, MelcloudPassword, "", InifileName);
 			return password;
 		}
+
+		public void SetPassword(string newPassword)
+		{
+			_hs.SaveINISetting(UserSection, MelcloudPassword, newPassword, InifileName);
+		}
+
+
 	}
 }

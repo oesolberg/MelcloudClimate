@@ -122,6 +122,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ConfigPage\GeneralConfig.cs" />
+    <Compile Include="ConfigPage\MainConfig.cs" />
+    <Compile Include="Handlers\RequestHandler.cs" />
     <Compile Include="HSPI.cs" />
     <Compile Include="Libraries\Devices\DeviceFinalHelpers.cs" />
     <Compile Include="Libraries\Devices\DeviceInternalHelpers.cs" />
@@ -152,6 +155,7 @@
       <Install>false</Install>
     </BootstrapperPackage>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
