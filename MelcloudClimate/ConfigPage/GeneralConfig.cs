@@ -13,20 +13,49 @@ namespace HSPI_MelcloudClimate.ConfigPage
 		private IAppCallbackAPI _callback;
 		private readonly IIniSettings _iniSettings;
 		private string _pluginName;
+		private const string IdKey = "id";
 		private const string _pageName = "MelCloud_General_Config";
 		private const string _pageNameText = "General Config";
 
 		private const string LogLevelKey = "LogLevelKey";
 		private const string TriggerCheckIntervalKey = "TriggerCheckInterval";
-		private const string UsernameKey = "UsernameKey";
+		private const string UserNameKey = "UserNameKey";
 		private const string PasswordKey = "PasswordKey";
 
-		public GeneralConfig(IHSApplication hs, IAppCallbackAPI callback,string pluginName, IIniSettings iniSettings) : base(_pageName)
+		public GeneralConfig(IHSApplication hs, IAppCallbackAPI callback, string pluginName, IIniSettings iniSettings) : base(_pageName)
 		{
 			_hs = hs;
 			_callback = callback;
 			_pluginName = pluginName;
 			_iniSettings = iniSettings;
+		}
+
+		public void Register()
+		{
+			Scheduler.PageBuilderAndMenu.clsPageBuilder pageToRegister;
+
+			_hs.RegisterPage(_pageName, _pluginName, _pluginName);
+
+			var linkText = _pageName;
+			linkText = linkText.Replace("MelCloud_", "").Replace("_", " ").Replace(_pluginName, "");
+			var pageTitle = linkText;
+
+			var wpd = new WebPageDesc
+			{
+				link = _pageName,
+				plugInName = _pluginName
+			};
+			_callback.RegisterConfigLink(wpd);
+
+			var webPageDescription = new WebPageDesc
+			{
+				plugInName = _pluginName,
+				link = _pageName,
+				linktext = pageTitle,
+				page_title = pageTitle
+			};
+			_hs.RegisterPage(_pageName, _pluginName, string.Empty);
+			_callback.RegisterLink(webPageDescription);
 		}
 
 		public string GetPagePlugin(string page, string user, int userRights, string queryString)
@@ -60,22 +89,22 @@ namespace HSPI_MelcloudClimate.ConfigPage
 			returnString.Append("<strong><div id=\'message\'>&nbsp;</div></strong><br/>");
 			returnString.Append(" <table border='0' cellpadding='0' cellspacing='0' width='1000'>");
 			returnString.Append("  <tr class='tableheader'><td width='250'>" + _pageNameText + "</td><td width='750'>" +
-			                    $"General settings for {_pluginName}" + "</td></tr>");
+								$"General settings for {_pluginName}" + "</td></tr>");
 			//time between calendar checks
 			returnString.Append("  <tr class='tablerowodd'><td>User name:</td><td>" +
-			                    SetUserName() + "</td></tr>");
+								SetUserName() + "</td></tr>");
 			//time between calendar checks
 			returnString.Append("  <tr class='tableroweven'><td>Password:</td><td>" +
-			                    SetPassword() + "</td></tr>");
+								SetPassword() + "</td></tr>");
 			//time between trigger checks
 			returnString.Append("  <tr class='tablerowodd'><td>Time between check of Melcloud:</td><td>" +
-			                    SetMelCloudTimeCheck() + "</td></tr>");
+								SetMelCloudTimeCheck() + "</td></tr>");
 
-		
+
 
 			//Set log level
 			returnString.Append("  <tr class='tablerowodd'><td>Log level:</td><td>" + SetLogLevelUserInterface() +
-			                    "</td></tr>");
+								"</td></tr>");
 
 
 			returnString.Append("</td></tr>");
@@ -89,12 +118,17 @@ namespace HSPI_MelcloudClimate.ConfigPage
 
 		private string SetPassword()
 		{
-			return string.Empty;
+
+			var passwordTextBox = new clsJQuery.jqTextBox(PasswordKey, "text", "", _pageName, 40, false);
+			passwordTextBox.defaultText = _iniSettings.UserNameMelCloud;
+			return passwordTextBox.Build();
 		}
 
 		private string SetUserName()
 		{
-			return string.Empty;
+			var userNameTextBox = new clsJQuery.jqTextBox(UserNameKey, "text", "", _pageName, 40, false);
+			userNameTextBox.defaultText = _iniSettings.UserNameMelCloud;
+			return userNameTextBox.Build();
 		}
 
 
@@ -126,38 +160,77 @@ namespace HSPI_MelcloudClimate.ConfigPage
 
 		public string PostBackProc(string page, string data, string user, int userRights)
 		{
-			
-			return "SOMETHING IS MISSING!!!";
+
+			Dictionary<string, string> dicQueryString = SplitDataString(data);
+
+			if (dicQueryString.ContainsKey(IdKey))
+			{
+				var configUnit = dicQueryString[IdKey];
+				switch (configUnit)
+				{
+					case LogLevelKey:
+						//HandleLogLevelDropDown(configUnit, dicQueryString[configUnit]);
+						break;
+						//case DoAuthKey:
+						//	HandleDoAuthentication(configUnit, dicQueryString[configUnit]);
+						//	break;
+						//case DoAuthMsKey:
+						//	HandleDoMsAuthentication(configUnit, dicQueryString[configUnit]);
+						//	break;
+
+				}
+
+				if (configUnit.Contains(UserNameKey))
+				{
+					//HandleChangeOfUserName(dicQueryString);
+				}
+
+				if (configUnit.Contains(PasswordKey))
+				{
+					//HandleChangeOfChosenMsCalendars(dicQueryString);
+				}
+
+				//if (configUnit.Contains(CheckCalendarButtonKey))
+				//{
+				//	HandleUpdateOfCalendar();
+				//}
+			}
+
+			else if (dicQueryString.ContainsKey(UserNameKey))
+			{
+				//HandleTriggerCheckIntervalChange(dicQueryString);
+			}
+			else if (dicQueryString.ContainsKey(PasswordKey))
+			{
+				//HandleTriggerCheckIntervalChange(dicQueryString);
+			}
+			else if (dicQueryString.ContainsKey(TriggerCheckIntervalKey))
+			{
+				//HandleTriggerCheckIntervalChange(dicQueryString);
+			}
+
+			return base.postBackProc(page, data, user, userRights);
 		}
 
-		public void Register()
+		private Dictionary<string, string> SplitDataString(string data)
 		{
-			Scheduler.PageBuilderAndMenu.clsPageBuilder pageToRegister;
-			
-			_hs.RegisterPage(_pageName, _pluginName, _pluginName);
-
-			var linkText = _pageName;
-			linkText = linkText.Replace("MelCloud_", "").Replace("_", " ").Replace(_pluginName, "");
-			var pageTitle = linkText;
-
-			var wpd = new WebPageDesc
+			var returnDictionary = new Dictionary<string, string>();
+			var splitByAmper = data.Split(new char[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
+			foreach (var nameValuePair in splitByAmper)
 			{
-				link = _pageName,
-				plugInName = _pluginName
-			};
-			_callback.RegisterConfigLink(wpd);
+				var splitByEqual = nameValuePair.Split(new char[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
+				if (splitByEqual.Length > 1)
+				{
+					returnDictionary.Add(splitByEqual[0], splitByEqual[1]);
+				}
 
-			var webPageDescription = new WebPageDesc
-			{
-				plugInName = _pluginName,
-				link = _pageName ,
-				linktext = pageTitle,
-				page_title = pageTitle 
-			};
-			_hs.RegisterPage(_pageName, _pluginName, string.Empty);
-			_callback.RegisterLink(webPageDescription);
+				if (splitByEqual.Length == 1)
+				{
+					returnDictionary.Add(splitByEqual[0], string.Empty);
+				}
+			}
+
+			return returnDictionary;
 		}
-
-		
 	}
 }
