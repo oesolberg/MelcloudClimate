@@ -123,7 +123,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ConfigPage\GeneralConfig.cs" />
-    <Compile Include="ConfigPage\MainConfig.cs" />
     <Compile Include="Handlers\RequestHandler.cs" />
     <Compile Include="HSPI.cs" />
     <Compile Include="Libraries\Devices\DeviceFinalHelpers.cs" />

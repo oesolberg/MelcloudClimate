@@ -6,6 +6,7 @@ using System;
 using System.Threading.Tasks;
 using HSPI_MelcloudClimate.Libraries.Devices;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using HomeSeerAPI;
 using HSPI_MelcloudClimate.ConfigPage;
 using HSPI_MelcloudClimate.Libraries;
@@ -15,12 +16,10 @@ using HSPI_MelcloudClimate.Libraries.Settings;
 namespace HSPI_MelcloudClimate
 {
 	// ReSharper disable once InconsistentNaming
-	public class HSPI : HspiBase2
+	public class HSPI : HspiBase
 	{
 		protected string Location = "MelcloudClimate";
 		protected string Location2 = "MelcloudClimate";
-		//protected string MelcloudEmail = "YOUREMAILHEREFORMELCLOUD";
-		//protected string MelcloudPassword = "YOURPASSWORDHEREFORMELCLOUD";
 		private dynamic ContextKey;
 		//private System.Collections.Generic.List<Device> ClimateDevices;
 		private dynamic ClimateDevices = new Dictionary<string, Dictionary<string, Device>>();
@@ -48,12 +47,12 @@ namespace HSPI_MelcloudClimate
 			return false; //No com port
 		}
 
-		public string GetPagePlugin(string page, string user, int userRights, string queryString)
+		public override string GetPagePlugin(string page, string user, int userRights, string queryString)
 		{
 			return _config.GetPagePlugin(page, user, userRights, queryString);
 		}
 
-		public string PostBackProc(string page, string data, string user, int userRights)
+		public override string PostBackProc(string page, string data, string user, int userRights)
 		{
 			return _config.PostBackProc(page, data, user, userRights);
 		}
@@ -64,7 +63,7 @@ namespace HSPI_MelcloudClimate
 			{
 
 
-				Console.WriteLine(JsonCommand["119788"].ToString());
+				//Console.WriteLine(JsonCommand["119788"].ToString());
 				Console.WriteLine("SetIOMulti set value: " + CC.ControlValue.ToString() + "->ref:" + CC.Ref.ToString());
 
 				//Get the device that did the request
@@ -116,8 +115,8 @@ namespace HSPI_MelcloudClimate
 
 			try
 			{
-				Login(); //Login to the system
-				Task.Run((Action)RunApplication);
+				//Login(); //Login to the system
+				//Task.Run((Action)RunApplication);
 			}
 			catch (Exception ex)
 			{
@@ -282,6 +281,7 @@ namespace HSPI_MelcloudClimate
 				Unique = deviceId
 
 			}
+				
 			.addPED("DeviceId", deviceId)
 			.addPED("Type", "Current")
 			.CheckAndCreate((double)device.Device.RoomTemperature)
@@ -422,7 +422,7 @@ namespace HSPI_MelcloudClimate
 				request.AddParameter("buildingID", pair.Value.GetValue("BuildingId"));
 
 				IRestResponse response = client.Execute(request);
-
+				Console.WriteLine(response.Content);
 				dynamic deviceResponse = JObject.Parse(response.Content);
 
 				//Update fields
@@ -704,5 +704,241 @@ namespace HSPI_MelcloudClimate
 		}
 
 
+		////// NOT USED (yet) ///////////////
+
+		public override object PluginFunction(string functionName, object[] parameters)
+		{
+			return (object)null;
+		}
+		public override object PluginPropertyGet(string propertyName, object[] parameters)
+		{
+			return (object)null;
+		}
+
+		public override void PluginPropertySet(string propertyName, object value)
+		{
+		}
+		public override void SetDeviceValue(int deviceId, double value, bool trigger = true)
+		{
+			this.HS.SetDeviceValueByRef(deviceId, value, trigger);
+		}
+
+		public override string ConfigDevice(int deviceId, string user, int userRights, bool newDevice)
+		{
+			return "";
+		}
+
+		public override Enums.ConfigDevicePostReturn ConfigDevicePost(
+			int deviceId,
+			string data,
+			string user,
+			int userRights)
+		{
+			return Enums.ConfigDevicePostReturn.DoneAndCancel;
+		}
+
+		public override string get_TriggerName(int triggerNumber)
+		{
+			return "";
+		}
+
+		public override bool HandleAction(IPlugInAPI.strTrigActInfo actionInfo)
+		{
+			return false;
+		}
+
+		public override void SpeakIn(int deviceId, string text, bool wait, string host)
+		{
+		}
+
+		public override string GenPage(string link)
+		{
+			return "";
+		}
+
+		public override string PagePut(string data)
+		{
+			return "";
+		}
+
+
+		public override string get_ActionName(int actionNumber)
+		{
+			return "";
+		}
+
+		public override bool get_Condition(IPlugInAPI.strTrigActInfo actionInfo)
+		{
+			return false;
+		}
+
+		public override void set_Condition(IPlugInAPI.strTrigActInfo actionInfo, bool value)
+		{
+		}
+
+		public override bool get_HasConditions(int triggerNumber)
+		{
+			return false;
+		}
+
+		public override string TriggerBuildUI(
+			string uniqueControlId,
+			IPlugInAPI.strTrigActInfo triggerInfo)
+		{
+			return "";
+		}
+
+		public override string TriggerFormatUI(IPlugInAPI.strTrigActInfo actionInfo)
+		{
+			return "";
+		}
+
+		public override IPlugInAPI.strMultiReturn TriggerProcessPostUI(
+			NameValueCollection postData,
+			IPlugInAPI.strTrigActInfo actionInfo)
+		{
+			return new IPlugInAPI.strMultiReturn();
+		}
+
+		public override bool TriggerReferencesDevice(IPlugInAPI.strTrigActInfo actionInfo, int deviceId)
+		{
+			return false;
+		}
+
+		public override bool TriggerTrue(IPlugInAPI.strTrigActInfo actionInfo)
+		{
+			return false;
+		}
+
+		public override int get_SubTriggerCount(int triggerNumber)
+		{
+			return 0;
+		}
+
+		public override string get_SubTriggerName(int triggerNumber, int subTriggerNumber)
+		{
+			return "";
+		}
+
+		public override bool get_TriggerConfigured(IPlugInAPI.strTrigActInfo actionInfo)
+		{
+			return true;
+		}
+
+		public override SearchReturn[] Search(string searchString, bool regEx)
+		{
+			return (SearchReturn[])null;
+		}
+
+		public override string ActionBuildUI(
+			string uniqueControlId,
+			IPlugInAPI.strTrigActInfo actionInfo)
+		{
+			return "";
+		}
+
+		public override bool ActionConfigured(IPlugInAPI.strTrigActInfo actionInfo)
+		{
+			return true;
+		}
+
+		public override int ActionCount()
+		{
+			return 0;
+		}
+
+		public override string ActionFormatUI(IPlugInAPI.strTrigActInfo actionInfo)
+		{
+			return "";
+		}
+
+		public override IPlugInAPI.strMultiReturn ActionProcessPostUI(
+			NameValueCollection postData,
+			IPlugInAPI.strTrigActInfo actionInfo)
+		{
+			return new IPlugInAPI.strMultiReturn();
+		}
+
+		public override bool ActionReferencesDevice(IPlugInAPI.strTrigActInfo actionInfo, int deviceId)
+		{
+			return false;
+		}
+
+		public override bool RaisesGenericCallbacks()
+		{
+			return false;
+		}
+
+		public override void HSEvent(Enums.HSEvent eventType, object[] parameters)
+		{
+		}
+
+
+		public override IPlugInAPI.PollResultInfo PollDevice(int deviceId)
+		{
+			return new IPlugInAPI.PollResultInfo()
+			{
+				Result = IPlugInAPI.enumPollResult.Device_Not_Found,
+				Value = 0.0
+			};
+		}
+
+		protected override bool GetHasTriggers()
+		{
+			return false;
+		}
+
+		protected override int GetTriggerCount()
+		{
+			return 0;
+		}
+
+		public override bool SupportsAddDevice()
+		{
+			return false;
+		}
+
+		public override bool SupportsConfigDevice()
+		{
+			return false;
+		}
+
+		public override bool SupportsConfigDeviceAll()
+		{
+			return false;
+		}
+
+		public override bool SupportsMultipleInstances()
+		{
+			return false;
+		}
+
+		public override bool SupportsMultipleInstancesSingleEXE()
+		{
+			return false;
+		}
+
+		public override int Capabilities()
+		{
+			return 4;
+		}
+
+		public override int AccessLevel()
+		{
+			return 1;
+		}
+
+		public override IPlugInAPI.strInterfaceStatus InterfaceStatus()
+		{
+			return new IPlugInAPI.strInterfaceStatus()
+			{
+				intStatus = IPlugInAPI.enumInterfaceStatus.OK
+			};
+		}
+
+		public override string InstanceFriendlyName()
+		{
+			return string.Empty;
+		}
 	}
 }

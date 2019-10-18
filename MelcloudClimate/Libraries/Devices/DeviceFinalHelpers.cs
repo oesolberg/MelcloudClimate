@@ -16,6 +16,17 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
                 return GetName() + "_" + Unique + "_" + Name + "_child";
         }
 
+        public Device AddFloor(string floor)
+        {
+	        this.Location = floor;
+	        return this;
+		}
+
+        public Device AddRoom(string room)
+        {
+	        this.Location2 = room;
+	        return this;
+        }
 
         public Device AddStatusField(int startValue, int endValue,  string suffix, bool includeValues = true, string graphicsPath = null)
         {
@@ -41,11 +52,6 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
 
         public Device AddStatusControlRangeField(int startValue, int endValue, string suffix, bool includeValues = true, string graphicsPath = null)
         {
-
-      
-
-
-
             var vsPair = new VSVGPairs.VSPair(ePairStatusControl.Both)
             {
                 PairType = VSVGPairs.VSVGPairType.Range,
