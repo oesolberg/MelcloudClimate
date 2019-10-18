@@ -7,7 +7,9 @@ using System.Threading.Tasks;
 using HSPI_MelcloudClimate.Libraries.Devices;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Diagnostics;
 using HomeSeerAPI;
+using HSPI_MelcloudClimate.Common;
 using HSPI_MelcloudClimate.ConfigPage;
 using HSPI_MelcloudClimate.Libraries;
 using HSPI_MelcloudClimate.Libraries.Logs;
@@ -31,6 +33,7 @@ namespace HSPI_MelcloudClimate
 		public static bool bShutDown = false;
 		private Setting _settings;
 		private GeneralConfig _config;
+		private IIniSettings _iniSettings;
 
 		public Log.LogType LOG_TYPE_INFO { get; private set; }
 		public Log.LogType LOG_TYPE_ERROR { get; private set; }
@@ -104,8 +107,8 @@ namespace HSPI_MelcloudClimate
 			Log = new Log(HS);
 
 			Log.Write("Starting plugin", LOG_TYPE_INFO);
-
-			_config = new GeneralConfig(HS,Callback, MelCloudPluginName);
+			_iniSettings = new IniSettings(HS);
+			_config = new GeneralConfig(HS, Callback, MelCloudPluginName,_iniSettings);
 			_config.Register();
 
 			_settings = new Setting(HS);
@@ -115,8 +118,13 @@ namespace HSPI_MelcloudClimate
 
 			try
 			{
-				//Login(); //Login to the system
-				//Task.Run((Action)RunApplication);
+				if (!Debugger.IsAttached)//Added to not run application when debugging 
+				{
+					Login(); //Login to the system
+					Task.Run((Action)RunApplication);
+
+				}
+
 			}
 			catch (Exception ex)
 			{
@@ -281,7 +289,7 @@ namespace HSPI_MelcloudClimate
 				Unique = deviceId
 
 			}
-				
+
 			.addPED("DeviceId", deviceId)
 			.addPED("Type", "Current")
 			.CheckAndCreate((double)device.Device.RoomTemperature)

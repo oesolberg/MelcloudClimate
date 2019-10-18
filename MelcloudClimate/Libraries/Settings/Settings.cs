@@ -17,6 +17,15 @@ namespace HSPI_MelcloudClimate.Libraries.Settings
 			_hs = HS;
 		}
 
+		public bool IsTesting
+		{
+			get
+			{
+				var temp = _hs.GetINISetting(UserSection, MelcloudUserName, "false", InifileName);
+				return bool.TryParse(temp,out var isTesting) ? isTesting : isTesting;
+			}
+		}
+
 
 		public string GetEmail()
 		{
