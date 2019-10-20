@@ -156,11 +156,8 @@ namespace HSPI_MelcloudClimate
 			ContextKey = null; //Reset context key
 			IRestResponse response = null; //Reset response if it would be set
 
-
-
-			var melcloudEmail = _settings.GetEmail();
-			//_settings.SetPassword("1Gangtil");
-			var melcloudPassword = _settings.GetPassword();
+			var melcloudEmail = _iniSettings.UserNameMelCloud;
+			var melcloudPassword = _iniSettings.PasswordMelCloud;
 
 			try
 			{

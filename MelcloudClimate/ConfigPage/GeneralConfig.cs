@@ -64,7 +64,6 @@ namespace HSPI_MelcloudClimate.ConfigPage
 			this.reset();
 			var returnString = new StringBuilder();
 
-
 			returnString.Append("<title>" + _pageNameText + "</title>");
 			returnString.Append(_hs.GetPageHeader(_pageName, _pluginName, "", "", false, false));
 			//' a message area for error messages from jquery ajax post back (optional, only needed if using AJAX calls to get data)
@@ -97,7 +96,7 @@ namespace HSPI_MelcloudClimate.ConfigPage
 			returnString.Append("  <tr class='tableroweven'><td>Password:</td><td>" +
 								SetPassword() + "</td></tr>");
 			//time between trigger checks
-			returnString.Append("  <tr class='tablerowodd'><td>Time between check of Melcloud:</td><td>" +
+			returnString.Append("  <tr class='tablerowodd'><td>Time between check of Melcloud (minutes:seconds):</td><td>" +
 								SetMelCloudTimeCheck() + "</td></tr>");
 
 
@@ -118,9 +117,8 @@ namespace HSPI_MelcloudClimate.ConfigPage
 
 		private string SetPassword()
 		{
-
 			var passwordTextBox = new clsJQuery.jqTextBox(PasswordKey, "text", "", _pageName, 40, false);
-			passwordTextBox.defaultText = _iniSettings.UserNameMelCloud;
+			passwordTextBox.defaultText = _iniSettings.PasswordMelCloud;
 			return passwordTextBox.Build();
 		}
 
@@ -171,17 +169,18 @@ namespace HSPI_MelcloudClimate.ConfigPage
 					case LogLevelKey:
 						HandleLogLevelDropDown(configUnit, dicQueryString[configUnit]);
 						break;
-						//case DoAuthKey:
-						//	HandleDoAuthentication(configUnit, dicQueryString[configUnit]);
-						//	break;
-						//case DoAuthMsKey:
-						//	HandleDoMsAuthentication(configUnit, dicQueryString[configUnit]);
-						//	break;
-						default:PostError("Unknown post back");
-							break;
+					//case DoAuthKey:
+					//	HandleDoAuthentication(configUnit, dicQueryString[configUnit]);
+					//	break;
+					//case DoAuthMsKey:
+					//	HandleDoMsAuthentication(configUnit, dicQueryString[configUnit]);
+					//	break;
+					default:
+						PostError("Unknown post back");
+						break;
 				}
 
-				
+
 			}
 
 			else if (dicQueryString.ContainsKey(UserNameKey))
@@ -210,7 +209,14 @@ namespace HSPI_MelcloudClimate.ConfigPage
 		{
 			var timeString = dicQueryString[TriggerCheckIntervalKey];
 			var timespan = GetTimespanFromTimeString(timeString);
-			_iniSettings.CheckMelCloudTimerInterval = (int)timespan.TotalSeconds;
+			if (timespan > new TimeSpan(0, 0, 0, 9))
+			{
+				_iniSettings.CheckMelCloudTimerInterval = (int)timespan.TotalSeconds;
+			}
+			else
+			{
+				PostError("Timespan is to little, minimum is 10 seconds. Change will not be stored.");
+			}
 		}
 
 		private TimeSpan GetTimespanFromTimeString(string timeString)
@@ -242,9 +248,8 @@ namespace HSPI_MelcloudClimate.ConfigPage
 
 		private void HandleUserNameChange(Dictionary<string, string> dicQueryString)
 		{
-
 			var userName = dicQueryString[UserNameKey];
-			_iniSettings.PasswordMelCloud = userName;
+			_iniSettings.UserNameMelCloud = userName;
 		}
 
 		private Dictionary<string, string> SplitDataString(string data)
