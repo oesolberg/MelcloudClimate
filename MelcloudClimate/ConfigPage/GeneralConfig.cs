@@ -169,7 +169,7 @@ namespace HSPI_MelcloudClimate.ConfigPage
 				switch (configUnit)
 				{
 					case LogLevelKey:
-						//HandleLogLevelDropDown(configUnit, dicQueryString[configUnit]);
+						HandleLogLevelDropDown(configUnit, dicQueryString[configUnit]);
 						break;
 						//case DoAuthKey:
 						//	HandleDoAuthentication(configUnit, dicQueryString[configUnit]);
@@ -177,46 +177,81 @@ namespace HSPI_MelcloudClimate.ConfigPage
 						//case DoAuthMsKey:
 						//	HandleDoMsAuthentication(configUnit, dicQueryString[configUnit]);
 						//	break;
-
+						default:PostError("Unknown post back");
+							break;
 				}
 
-				if (configUnit.Contains(UserNameKey))
-				{
-					//HandleChangeOfUserName(dicQueryString);
-				}
-
-				if (configUnit.Contains(PasswordKey))
-				{
-					//HandleChangeOfChosenMsCalendars(dicQueryString);
-				}
-
-				//if (configUnit.Contains(CheckCalendarButtonKey))
-				//{
-				//	HandleUpdateOfCalendar();
-				//}
+				
 			}
 
 			else if (dicQueryString.ContainsKey(UserNameKey))
 			{
-				//HandleTriggerCheckIntervalChange(dicQueryString);
+				HandleUserNameChange(dicQueryString);
 			}
 			else if (dicQueryString.ContainsKey(PasswordKey))
 			{
-				//HandleTriggerCheckIntervalChange(dicQueryString);
+				HandlePasswordChange(dicQueryString);
 			}
 			else if (dicQueryString.ContainsKey(TriggerCheckIntervalKey))
 			{
-				//HandleTriggerCheckIntervalChange(dicQueryString);
+				HandleTriggerCheckIntervalChange(dicQueryString);
 			}
 
 			return base.postBackProc(page, data, user, userRights);
 		}
 
+		private void HandleLogLevelDropDown(string configUnit, string chosenNumber)
+		{
+			var logLevel = (LogLevel)Enum.Parse(typeof(LogLevel), chosenNumber);
+			_iniSettings.LogLevel = logLevel;
+		}
+
+		private void HandleTriggerCheckIntervalChange(Dictionary<string, string> dicQueryString)
+		{
+			var timeString = dicQueryString[TriggerCheckIntervalKey];
+			var timespan = GetTimespanFromTimeString(timeString);
+			_iniSettings.CheckMelCloudTimerInterval = (int)timespan.TotalSeconds;
+		}
+
+		private TimeSpan GetTimespanFromTimeString(string timeString)
+		{
+			var resultingTimeSpan = new TimeSpan(0, 0, 1, 0);
+			//Only minutes and seconds
+			if (!string.IsNullOrWhiteSpace(timeString) && timeString.Length >= 3)
+			{
+				var splitOnColon = timeString.Split(':');
+
+				var numberOfMinutes = int.Parse(splitOnColon[0]);
+				var numberOfSeconds = int.Parse(splitOnColon[1]);
+
+				resultingTimeSpan = new TimeSpan(0, 0, numberOfMinutes, numberOfSeconds);
+				if (resultingTimeSpan.TotalSeconds >= 3600)
+				{
+					resultingTimeSpan = new TimeSpan(0, 0, 59, 59);
+				}
+			}
+
+			return resultingTimeSpan;
+		}
+
+		private void HandlePasswordChange(Dictionary<string, string> dicQueryString)
+		{
+			var password = dicQueryString[PasswordKey];
+			_iniSettings.PasswordMelCloud = password;
+		}
+
+		private void HandleUserNameChange(Dictionary<string, string> dicQueryString)
+		{
+
+			var userName = dicQueryString[UserNameKey];
+			_iniSettings.PasswordMelCloud = userName;
+		}
+
 		private Dictionary<string, string> SplitDataString(string data)
 		{
 			var returnDictionary = new Dictionary<string, string>();
-			var splitByAmper = data.Split(new char[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
-			foreach (var nameValuePair in splitByAmper)
+			var splitByAmpersand = data.Split(new char[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
+			foreach (var nameValuePair in splitByAmpersand)
 			{
 				var splitByEqual = nameValuePair.Split(new char[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
 				if (splitByEqual.Length > 1)
@@ -231,6 +266,11 @@ namespace HSPI_MelcloudClimate.ConfigPage
 			}
 
 			return returnDictionary;
+		}
+
+		private void PostError(string message)
+		{
+			this.divToUpdate.Add("errormessage", message);
 		}
 	}
 }
