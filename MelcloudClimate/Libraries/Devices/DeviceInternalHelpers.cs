@@ -82,12 +82,10 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
         }
         
         
-        private void createRootDevice()
+        private void CreateRootDevice()
         {
             Console.WriteLine("Creating a new root device");
             //Log.Write("Creating a new root device");
-            
-            
             try
             {
                 //Creating a brand new device, and get the actual device from the device reference
@@ -119,7 +117,7 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
            
         }
         
-        private int createChildDevice()
+        private int CreateChildDevice()
         {
           
             try
@@ -149,7 +147,7 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
            
         }
 
-        public int getDeviceId()
+        public int GetDeviceId()
         {
             return _context.DeviceRefId;
         }

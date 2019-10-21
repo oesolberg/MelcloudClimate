@@ -16,6 +16,7 @@ namespace HSPI_MelcloudClimate.Common
 
 		string UserNameMelCloud { get; set; }
 		string PasswordMelCloud{ get; set; }
+		double CheckMelCloudTimerIntervalInMilliseconds { get; }
 
 		event IniSettingsChangedEventHandler IniSettingsChanged;
 
@@ -41,7 +42,7 @@ namespace HSPI_MelcloudClimate.Common
 		private string _msAppId;
 		private string _userName;
 		private string _password;
-		private const int DefaultTriggerTimeInterval = 20;
+		private const int DefaultTriggerTimeInterval = 70;
 
 
 		public IniSettings(IHSApplication hs)
@@ -85,6 +86,7 @@ namespace HSPI_MelcloudClimate.Common
 				OnIniSettingsChanged();
 		}
 
+		public double CheckMelCloudTimerIntervalInMilliseconds => _checkTriggerTimerInterval * 1000;
 		public event IniSettingsChangedEventHandler IniSettingsChanged;
 
 		public int CheckMelCloudTimerInterval

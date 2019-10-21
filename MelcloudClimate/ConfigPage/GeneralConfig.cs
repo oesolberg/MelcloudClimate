@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using HomeSeerAPI;
 using HSPI_MelcloudClimate.Common;
+using HSPI_MelcloudClimate.Libraries.Logs;
 using Scheduler;
 
 namespace HSPI_MelcloudClimate.ConfigPage
@@ -13,6 +14,7 @@ namespace HSPI_MelcloudClimate.ConfigPage
 		private IAppCallbackAPI _callback;
 		private readonly IIniSettings _iniSettings;
 		private string _pluginName;
+		private ILog _log;
 		private const string IdKey = "id";
 		private const string _pageName = "MelCloud_General_Config";
 		private const string _pageNameText = "General Config";
@@ -22,12 +24,14 @@ namespace HSPI_MelcloudClimate.ConfigPage
 		private const string UserNameKey = "UserNameKey";
 		private const string PasswordKey = "PasswordKey";
 
-		public GeneralConfig(IHSApplication hs, IAppCallbackAPI callback, string pluginName, IIniSettings iniSettings) : base(_pageName)
+		public GeneralConfig(IHSApplication hs, IAppCallbackAPI callback, 
+			string pluginName, IIniSettings iniSettings, ILog log) : base(_pageName)
 		{
 			_hs = hs;
 			_callback = callback;
 			_pluginName = pluginName;
 			_iniSettings = iniSettings;
+			_log = log;
 		}
 
 		public void Register()
@@ -60,7 +64,7 @@ namespace HSPI_MelcloudClimate.ConfigPage
 
 		public string GetPagePlugin(string page, string user, int userRights, string queryString)
 		{
-			Console.WriteLine($"got call for page {page} from user {user} with user rights {userRights} and querystring {queryString}");
+			_log.Debug($"got call for page {page} from user {user} with user rights {userRights} and querystring {queryString}");
 			this.reset();
 			var returnString = new StringBuilder();
 
@@ -89,21 +93,22 @@ namespace HSPI_MelcloudClimate.ConfigPage
 			returnString.Append(" <table border='0' cellpadding='0' cellspacing='0' width='1000'>");
 			returnString.Append("  <tr class='tableheader'><td width='250'>" + _pageNameText + "</td><td width='750'>" +
 								$"General settings for {_pluginName}" + "</td></tr>");
-			//time between calendar checks
+			
+			//Set user name
 			returnString.Append("  <tr class='tablerowodd'><td>User name:</td><td>" +
 								SetUserName() + "</td></tr>");
-			//time between calendar checks
+			
+			//set password
 			returnString.Append("  <tr class='tableroweven'><td>Password:</td><td>" +
 								SetPassword() + "</td></tr>");
-			//time between trigger checks
-			returnString.Append("  <tr class='tablerowodd'><td>Time between check of Melcloud (minutes:seconds):</td><td>" +
-								SetMelCloudTimeCheck() + "</td></tr>");
 
+			//time between Melcloud checks
+			//returnString.Append("  <tr class='tablerowodd'><td>Time between check of Melcloud (minutes:seconds):</td><td>" +
+			//					SetMelCloudTimeCheck() + "</td></tr>");
 
-
-			//Set log level
-			returnString.Append("  <tr class='tablerowodd'><td>Log level:</td><td>" + SetLogLevelUserInterface() +
-								"</td></tr>");
+			////Set log level
+			//returnString.Append("  <tr class='tablerowodd'><td>Log level:</td><td>" + SetLogLevelUserInterface() +
+			//					"</td></tr>");
 
 
 			returnString.Append("</td></tr>");
@@ -169,18 +174,10 @@ namespace HSPI_MelcloudClimate.ConfigPage
 					case LogLevelKey:
 						HandleLogLevelDropDown(configUnit, dicQueryString[configUnit]);
 						break;
-					//case DoAuthKey:
-					//	HandleDoAuthentication(configUnit, dicQueryString[configUnit]);
-					//	break;
-					//case DoAuthMsKey:
-					//	HandleDoMsAuthentication(configUnit, dicQueryString[configUnit]);
-					//	break;
 					default:
 						PostError("Unknown post back");
 						break;
 				}
-
-
 			}
 
 			else if (dicQueryString.ContainsKey(UserNameKey))

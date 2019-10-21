@@ -29,14 +29,14 @@ namespace HSPI_MelcloudClimate
 		private static System.Timers.Timer timer;
 		private object pedData = 0;
 		private RestClient client = new RestClient("https://app.melcloud.com/Mitsubishi.Wifi.Client/");
-		private Log Log;
+		private ILog _log;
 		public static bool bShutDown = false;
 		private Setting _settings;
 		private GeneralConfig _config;
-		private IIniSettings _iniSettings;
+		protected IIniSettings _iniSettings;
 
-		public Log.LogType LOG_TYPE_INFO { get; private set; }
-		public Log.LogType LOG_TYPE_ERROR { get; private set; }
+		//public LogType LOG_TYPE_INFO { get; private set; }
+		//public LogType LOG_TYPE_ERROR { get; private set; }
 
 		protected override string GetName()
 		{
@@ -64,10 +64,7 @@ namespace HSPI_MelcloudClimate
 		{
 			foreach (CAPI.CAPIControl CC in colSend)
 			{
-
-
-				//Console.WriteLine(JsonCommand["119788"].ToString());
-				Console.WriteLine("SetIOMulti set value: " + CC.ControlValue.ToString() + "->ref:" + CC.Ref.ToString());
+				_log.Debug("SetIOMulti set value: " + CC.ControlValue.ToString() + "->ref:" + CC.Ref.ToString());
 
 				//Get the device that did the request
 
@@ -104,27 +101,24 @@ namespace HSPI_MelcloudClimate
 
 		public override string InitIO(string port)
 		{
-			Log = new Log(HS);
-
-			Log.Write("Starting plugin", LOG_TYPE_INFO);
 			_iniSettings = new IniSettings(HS);
-			_config = new GeneralConfig(HS, Callback, MelCloudPluginName,_iniSettings);
+
+			_log = new Log(HS, _iniSettings);
+
+			_log.Info("Starting plugin");
+			_config = new GeneralConfig(HS, Callback, MelCloudPluginName,_iniSettings,_log);
 			_config.Register();
 
 			_settings = new Setting(HS);
 			_settings.DoInifileTemplateIfFileMissing();
 
-
-
 			try
 			{
-				if (!Debugger.IsAttached)//Added to not run application when debugging 
+				//if (!Debugger.IsAttached)//Added to not run application when debugging 
 				{
 					Login(); //Login to the system
-					Task.Run((Action)RunApplication);
-
+					var runningTask=Task.Run((Action)RunApplication);
 				}
-
 			}
 			catch (Exception ex)
 			{
@@ -135,14 +129,12 @@ namespace HSPI_MelcloudClimate
 
 			Shutdown = false;
 			return "";
-			// debug
-
 		}
 
 		public override void ShutdownIO()
 		{
 			// do your shutdown stuff here
-			Console.WriteLine("Shutting down plugin");
+			_log.Info($"Shutting down plugin {Utility.PluginName}");
 			Shutdown = true;
 			// setting this flag will cause the plugin to disconnect immediately from HomeSeer
 		}
@@ -151,7 +143,7 @@ namespace HSPI_MelcloudClimate
 		//Login to Melcloud, if context is set, then reset the key
 		private void Login()
 		{
-			Log.Info("Logging in to melcloud");
+			_log.Info("Logging in to melcloud");
 
 			ContextKey = null; //Reset context key
 			IRestResponse response = null; //Reset response if it would be set
@@ -167,53 +159,51 @@ namespace HSPI_MelcloudClimate
 				request.Parameters.Clear();
 				request.AddJsonBody(new { Email = melcloudEmail, Password = melcloudPassword, Language = 0, AppVersion = "1.16.1.2", Persist = "false", CaptchaResponse = "" });
 				response = client.Execute(request);
+				_log.Debug(response.Content);
 			}
 			catch (Exception ex)
 			{
-				Log.Info("Could not login to Melcloud" + ex);
+				_log.Info("Could not login to Melcloud" + ex);
 			}
 
 			if ((int)response.StatusCode == 200)
 			{
-				Log.Debug("Got a successful response from melcloud");
+				_log.Debug("Got a successful response from melcloud");
+				
 				dynamic data = JsonConvert.DeserializeObject(response.Content); //Convert data
 
 				if (data.ContainsKey("ErrorId") && data.ErrorId == null)
 				{
-					Log.Debug("Seems like a login was successful");
+					_log.Debug("Seems like a login was successful");
 					ContextKey = data.LoginData.ContextKey;
-					Log.Info("Successfully logged in to Melcloud");
+					_log.Info("Successfully logged in to Melcloud");
 				}
 				else
 				{
-					Log.Debug("Username or password invalid");
+					_log.Debug("Username or password invalid");
 					throw new Exception("Username or password invalid");
 				}
 			}
 			else
 			{
-				Log.Debug("Other Error");
+				_log.Debug("Other Error");
 				throw new Exception("Other Error");
 			}
-
-
 		}
+
 		private void RunApplication()
 		{
-
-
-
-			Log.Debug("Running Application Task");
+			_log.Debug("Running Application Task");
 
 			try
 			{
 				GetDevices();
 				RefreshDevices();
 
-				Log.Debug("Starting a loop timer");
-				timer = new System.Timers.Timer();
-				timer.Interval = 70000;
+				_log.Debug("Starting a loop timer");
 
+				timer = new System.Timers.Timer();
+				timer.Interval = _iniSettings.CheckMelCloudTimerIntervalInMilliseconds;
 				timer.Elapsed += OnTimedEvent;
 				timer.AutoReset = true;
 				timer.Enabled = true;
@@ -221,6 +211,7 @@ namespace HSPI_MelcloudClimate
 			}
 			catch (Exception ex)
 			{
+				_log.Error(ex.Message);
 				//bShutDown = true;
 				Shutdown = true;
 			}
@@ -228,7 +219,7 @@ namespace HSPI_MelcloudClimate
 
 		private void OnTimedEvent(Object source, System.Timers.ElapsedEventArgs e)
 		{
-			Console.WriteLine("Raised: {0}", e.SignalTime);
+			_log.Debug($"Raised: {e.SignalTime}");
 
 
 			//Periodical run system check
@@ -271,6 +262,7 @@ namespace HSPI_MelcloudClimate
 			}
 					.addPED("DeviceId", deviceId)
 					.addPED("Type", "State")
+					
 					.CheckAndCreate(powerState)
 					.AddButton(1, "On", $"images/HomeSeer/contemporary/on.gif")
 					.AddButton(0, "Off", $"images/HomeSeer/contemporary/off.gif");
@@ -279,7 +271,7 @@ namespace HSPI_MelcloudClimate
 
 			//Set the device to the modus picked up
 
-			Console.WriteLine("Parent id " + deviceId);
+			_log.Debug("Parent id " + deviceId);
 			Device CurrentTemperatureDevice = new Device(HS, RootDevice)
 			{
 				Name = "Current Temperature",
@@ -353,7 +345,7 @@ namespace HSPI_MelcloudClimate
 		private bool PowerOn(int DeviceId)
 		{
 			JsonCommand[DeviceId.ToString()].Power = true;
-			Console.WriteLine("Queued turn on aircon");
+			_log.Debug("Queued turn on aircon");
 			JsonCommand[DeviceId.ToString()].HasPendingCommand = true;
 			return true;
 		}
@@ -362,7 +354,7 @@ namespace HSPI_MelcloudClimate
 		private bool SetOperationMode(int DeviceId, int operationMode)
 		{
 			JsonCommand[DeviceId.ToString()].OperationMode = operationMode;
-			Console.WriteLine("Setting operational mode to: " + operationMode);
+			_log.Debug("Setting operational mode to: " + operationMode);
 			JsonCommand[DeviceId.ToString()].HasPendingCommand = true;
 			return true;
 		}
@@ -371,7 +363,7 @@ namespace HSPI_MelcloudClimate
 		private bool SetTemperature(int DeviceId, int target)
 		{
 			JsonCommand[DeviceId.ToString()].SetTemperature = target;
-			Console.WriteLine("Setting temperature to: " + target);
+			_log.Debug("Setting temperature to: " + target);
 			JsonCommand[DeviceId.ToString()].HasPendingCommand = true;
 			return true;
 		}
@@ -379,7 +371,7 @@ namespace HSPI_MelcloudClimate
 		private bool SetFanSpeed(int DeviceId, int target)
 		{
 			JsonCommand[DeviceId.ToString()].SetFanSpeed = target;
-			Console.WriteLine("Setting fan speed to: " + target);
+			_log.Debug("Setting fan speed to: " + target);
 			JsonCommand[DeviceId.ToString()].HasPendingCommand = true;
 			return true;
 		}
@@ -388,7 +380,7 @@ namespace HSPI_MelcloudClimate
 		private bool PowerOff(int DeviceId)
 		{
 			JsonCommand[DeviceId.ToString()].Power = false;
-			Console.WriteLine("Queued turn off aircon");
+			_log.Debug("Queued turn off aircon");
 			JsonCommand[DeviceId.ToString()].HasPendingCommand = true;
 			return true;
 		}
@@ -404,13 +396,13 @@ namespace HSPI_MelcloudClimate
 			{
 				if (JsonCommand[pair.Key.ToString()].HasPendingCommand == true)
 				{
-					Log.Debug("Waiting for changes, abort this update");
+					_log.Debug("Waiting for changes, abort this update");
 					break;
 				}
 
 
 				client = new RestClient("https://app.melcloud.com/Mitsubishi.Wifi.Client/");
-				Console.WriteLine("Updating devices");
+				_log.Debug("Updating devices");
 				//req = requests.get("https://app.melcloud.com/Mitsubishi.Wifi.Client/Device/Get", headers = { 'X-MitsContextKey': self._authentication.getContextKey()}, data = { 'id': self._deviceid, 'buildingID': self._buildingid})
 				//{ "id": "112833", "buildingID": "57359"}
 				var request = new RestRequest("Device/Get", Method.GET);
@@ -427,7 +419,7 @@ namespace HSPI_MelcloudClimate
 				request.AddParameter("buildingID", pair.Value.GetValue("BuildingId"));
 
 				IRestResponse response = client.Execute(request);
-				Console.WriteLine(response.Content);
+				_log.Debug(response.Content);
 				dynamic deviceResponse = JObject.Parse(response.Content);
 
 				//Update fields
@@ -558,7 +550,7 @@ namespace HSPI_MelcloudClimate
 		{
 			//Save all changes to the cloud
 
-			Console.WriteLine("Sending changes to cloud");
+			_log.Debug("Sending changes to cloud");
 
 
 
@@ -575,8 +567,8 @@ namespace HSPI_MelcloudClimate
 			request.AddJsonBody(JsonCommand[deviceId.ToString()].ToString());
 
 			IRestResponse response = client.Execute(request);
-			Console.WriteLine("Tried to save: " + JsonCommand[deviceId.ToString()].ToString());
-			Console.WriteLine(response.Content);
+			_log.Debug("Tried to save: " + JsonCommand[deviceId.ToString()].ToString());
+			_log.Debug(response.Content);
 
 			JsonCommand[deviceId.ToString()].HasPendingCommand = false; //Reset pending changes
 
@@ -585,11 +577,11 @@ namespace HSPI_MelcloudClimate
 
 		private void GetDevices(int retry = 0)
 		{
-			Log.Info("Fetching Devies from MelCloud");
+			_log.Info("Fetching Devies from MelCloud");
 
 			if (retry > 1)
 			{
-				Log.Error("Could not get devices after trying two times");
+				_log.Error("Could not get devices after trying two times");
 				throw new Exception("Could not get devices. Aborting. Check your user is active and Melcloud is working");
 			}
 
@@ -602,29 +594,31 @@ namespace HSPI_MelcloudClimate
 
 				IRestResponse response = client.Execute(request);
 
+				_log.Debug(response.Content);
+
 				if ((int)response.StatusCode == 200)
 				{
-					Log.Debug("Got a successful response from melcloud");
+					_log.Debug("Got a successful response from melcloud");
 					dynamic data = JsonConvert.DeserializeObject(response.Content); //Convert data
 
 					//Process all Floor devices
-					Log.Debug("Process all devices pr floor");
+					_log.Debug("Process all devices pr floor");
 					if (data[0].Structure.ContainsKey("Floors") && data[0].Structure.Floors.Count > 0)
 					{
 						for (int i = 0; i < data[0].Structure.Floors.Count; i++)
 						{
-							Log.Debug("A floor detected");
+							_log.Debug("A floor detected");
 							for (int j = 0; j < data[0].Structure.Floors[i].Devices.Count; j++)
 							{
-								Log.Debug("A device detected");
+								_log.Debug("A device detected");
 								CreateMelcloudDevice(data[0].Structure.Floors[i].Devices[j]);
 							}
 						}
 					}
 					else
-						Log.Debug("No floor devices found");
+						_log.Debug("No floor devices found");
 
-					Log.Debug("Process all devices pr area");
+					_log.Debug("Process all devices pr area");
 					if (data[0].Structure.ContainsKey("Areas") && data[0].Structure.Areas.Count > 0)
 					{
 						for (int i = 0; i < data[0].Structure.Area.Count; i++)
@@ -636,9 +630,9 @@ namespace HSPI_MelcloudClimate
 						}
 					}
 					else
-						Log.Debug("No area devices found");
+						_log.Debug("No area devices found");
 
-					Log.Debug("Process all devices pr clients");
+					_log.Debug("Process all devices pr clients");
 					if (data[0].Structure.ContainsKey("Clients") && data[0].Structure.Clients.Count > 0)
 					{
 						for (int i = 0; i < data[0].Structure.Clients.Count; i++)
@@ -650,9 +644,9 @@ namespace HSPI_MelcloudClimate
 						}
 					}
 					else
-						Log.Debug("No client devices found");
+						_log.Debug("No client devices found");
 
-					Log.Debug("Process all devices pr devices");
+					_log.Debug("Process all devices pr devices");
 					if (data[0].Structure.ContainsKey("Devices") && data[0].Structure.Devices.Count > 0)
 					{
 						for (int i = 0; i < data[0].Structure.Devices.Count; i++)
@@ -677,7 +671,7 @@ namespace HSPI_MelcloudClimate
 						}
 					}
 					else
-						Log.Debug("No client devices found");
+						_log.Debug("No client devices found");
 
 				}
 				else
@@ -691,7 +685,7 @@ namespace HSPI_MelcloudClimate
 					}
 					else
 					{
-						Log.Debug("No access, giving up");
+						_log.Debug("No access, giving up");
 						Shutdown = true; //Shutdown plugin - should not run after this error
 						throw new Exception("No access, giving up");
 
@@ -702,7 +696,7 @@ namespace HSPI_MelcloudClimate
 			}
 			catch (Exception ex)
 			{
-				Log.Info("Could not connect to Melcloud for fetching devices" + ex);
+				_log.Info("Could not connect to Melcloud for fetching devices" + ex);
 			}
 
 

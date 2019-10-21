@@ -1,91 +1,60 @@
 ﻿using HomeSeerAPI;
 using System;
+using HSPI_MelcloudClimate.Common;
 
 namespace HSPI_MelcloudClimate.Libraries.Logs
 {
-    public class Log : Library
-    {
+	public interface ILog
+	{
+		void Debug(string msg);
+		void Info(string msg);
+		void Error(string msg);
+		}
+	
+	public class Log : Library, ILog
+	{
+		public new IHSApplication _hs;
 
-        public new IHSApplication _hs;
-
-        public Log(IHSApplication HS)
-        {
-
-
-            _hs = HS;
-        }
+		public Log(IHSApplication HS, IIniSettings iniSettings)
+		{
+			_hs = HS;
+			_iniSettings = iniSettings;
+		}
 
 
-        public enum LogType
-        {
-            LOG_TYPE_INFO = 0,
-            LOG_TYPE_ERROR = 1,
-            LOG_TYPE_WARNING = 2
-        }
 
-        public void Debug(string msg)
-        {
-            if (msg == null)
-                msg = "";
+		public void Debug(string msg)
+		{
+			if (_iniSettings.LogLevel == LogLevel.Debug)
+			{
+				if (msg == null)
+					msg = "";
+				_hs.WriteLog(GetName() + " Debug", msg);
+				Console.WriteLine($"Debug: {msg}");
+			}
+		}
 
-            _hs.WriteLog(GetName() + " Debug", msg);
+		public void Info(string msg)
+		{
+			if (_iniSettings.LogLevel == LogLevel.Debug || _iniSettings.LogLevel == LogLevel.Normal)
+			{
+				if (msg == null)
+					msg = "";
 
-            Console.WriteLine(msg);
+				_hs.WriteLog(GetName() + " Info", msg);
 
-        }
+				Console.WriteLine($"Info: {msg}");
+			}
+		}
 
-        public void Info(string msg)
-        {
-            if (msg == null)
-                msg = "";
+		public void Error(string msg)
+		{
+			if (msg == null)
+				msg = "";
 
-            _hs.WriteLog(GetName() + " Info", msg);
+			_hs.WriteLog(GetName() + " Error", msg);
 
-            Console.WriteLine(msg);
-
-        }
-
-        public void Error(string msg)
-        {
-            if (msg == null)
-                msg = "";
-
-            _hs.WriteLog(GetName() + " Error", msg);
-
-            Console.WriteLine(msg);
-
-        }
-
-        public void Write(string msg, LogType logType)
-        {
-
-          try
-            {
-                if (msg == null)
-                    msg = "";
-                if (!Enum.IsDefined(typeof(LogType), logType))
-                {
-                    logType = LogType.LOG_TYPE_ERROR;
-                }
-                 Console.WriteLine(msg);
-                switch (logType)
-                {
-                    case LogType.LOG_TYPE_ERROR:
-                        _hs.WriteLog(GetName() + " Error", msg);
-                        break;
-                    case LogType.LOG_TYPE_WARNING:
-                        _hs.WriteLog(GetName() + " Warning", msg);
-                        break;
-                    case LogType.LOG_TYPE_INFO:
-                        _hs.WriteLog(GetName(), msg);
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Exception in LOG of " + GetName() + ": " + ex.Message);
-            }
-
-        }
-    }
+			Console.WriteLine($"Error: {msg}");
+		}
+	}
 }
