@@ -28,7 +28,7 @@ namespace HSPI_MelcloudClimate
 		//private System.Collections.Generic.List<Device> ClimateDevices;
 		private dynamic ClimateDevices = new Dictionary<string, Dictionary<string, Device>>();
 		private dynamic JsonCommand = new Dictionary<string, JObject>();
-		private static System.Timers.Timer timer;
+		private static System.Timers.Timer _timer;
 		private object pedData = 0;
 		private RestClient _client = new RestClient("https://app.melcloud.com/Mitsubishi.Wifi.Client/");
 		private ILog _log;
@@ -102,6 +102,8 @@ namespace HSPI_MelcloudClimate
 		{
 			_iniSettings = new IniSettings(HS);
 
+			_iniSettings.IniSettingsChanged += IniSettingsChanged;
+
 			_log = new Log(HS, _iniSettings);
 
 			_log.Info("Starting plugin");
@@ -113,46 +115,77 @@ namespace HSPI_MelcloudClimate
 
 			_restHandler = new RestHandler(_log);
 
-			SetTimer();
+			
 
 			StartLoginAndDataFetchingInNewThread();
 
+			
+
+			Shutdown = false;
+			return "";
+		}
+
+		private void IniSettingsChanged(object sender, EventArgs eventArgs)
+		{
+			//Reset timer
+			_timer.Close();
+
+			//Login with username and password
+			Login();
+			if (!_restHandler.NoContext)
+			{
+				SetTimer();
+			}
+		}
+
+		private void StartLoginAndDataFetchingInNewThread()
+		{
+			//Run fetching of first data if we can
+
+			//_workThread = new Thread(DoWork) { Name = GetPortAsString() };
+			//_workThread.Start();
 			try
 			{
 				//if (!Debugger.IsAttached)//Added to not run application when debugging 
 				{
 					Login(); //Login to the system
+					if (_restHandler.NoContext)
+					{
+						SetConnectedToFalse();
+					}
 					var runningTask = Task.Run((Action)RunApplication);
 				}
 			}
 			catch (Exception ex)
 			{
 				//bShutDown = true;
+				_log.Error($"Error on InitIO: {ex.Message}");
 				Shutdown = true;
-				return "Error on InitIO: " + ex.Message;
+				return;
+				//return "Error on InitIO: " + ex.Message;
 			}
-
-			Shutdown = false;
-			return "";
+			SetTimer();
 		}
 
-		private void StartLoginAndDataFetchingInNewThread()
+		private void SetConnectedToFalse()
 		{
-
-			//_workThread = new Thread(DoWork) { Name = GetPortAsString() };
-			//_workThread.Start();
-
+			foreach (KeyValuePair<string, JObject> pair in JsonCommand)
+			{
+				Device connectionDevice = ClimateDevices[pair.Key.ToString()][Constants.Connection];
+				connectionDevice.SetValue((double)0).SetText("Not connected");
+				//.SetText;
+			}
 		}
 
 		private void SetTimer()
 		{
 			//Setting timer 
 			_log.Debug($"Setting timer with {_iniSettings.CheckMelCloudTimerInterval} seconds interval");
-			timer = new System.Timers.Timer();
-			timer.Interval = _iniSettings.CheckMelCloudTimerIntervalInMilliseconds;
-			timer.Elapsed += OnTimedEvent;
-			timer.AutoReset = true;
-			timer.Enabled = true;
+			_timer = new System.Timers.Timer();
+			_timer.Interval = _iniSettings.CheckMelCloudTimerIntervalInMilliseconds;
+			_timer.Elapsed += OnTimedEvent;
+			_timer.AutoReset = true;
+			_timer.Enabled = true;
 		}
 
 
@@ -168,7 +201,7 @@ namespace HSPI_MelcloudClimate
 		//Login to Melcloud, if context is set, then reset the key
 		private void Login()
 		{
-			_log.Info("Logging in to melcloud");
+			_log.Info("Trying to log in to melcloud");
 
 			if (!_iniSettings.PasswordAndUsernameOk())
 			{
@@ -198,51 +231,6 @@ namespace HSPI_MelcloudClimate
 				_log.Info($"Could not login to Melcloud : {result.Error}");
 			}
 
-			//ContextKey = null; //Reset context key
-			//IRestResponse response = null; //Reset response if it would be set
-
-			//var melcloudEmail = _iniSettings.UserNameMelCloud;
-			//var melcloudPassword = _iniSettings.PasswordMelCloud;
-
-			//try
-			//{
-			//	var request = new RestRequest("Login/ClientLogin", Method.POST);
-			//	request.AddHeader("Accept", "application/json");
-			//	request.RequestFormat = DataFormat.Json;
-			//	request.Parameters.Clear();
-			//	request.AddJsonBody(new { Email = melcloudEmail, Password = melcloudPassword, Language = 0, AppVersion = "1.16.1.2", Persist = "false", CaptchaResponse = "" });
-			//	response = _client.Execute(request);
-			//	_log.Debug(response.Content);
-			//}
-			//catch (Exception ex)
-			//{
-			//	_log.Info("Could not login to Melcloud" + ex);
-
-			//}
-
-			//if ((int)response.StatusCode == 200)
-			//{
-			//	_log.Debug("Got a successful response from melcloud");
-
-			//	dynamic data = JsonConvert.DeserializeObject(response.Content); //Convert data
-
-			//	if (data.ContainsKey("ErrorId") && data.ErrorId == null)
-			//	{
-			//		_log.Debug("Seems like a login was successful");
-			//		ContextKey = data.LoginData.ContextKey;
-			//		_log.Info("Successfully logged in to Melcloud");
-			//	}
-			//	else
-			//	{
-			//		_log.Debug("Username or password invalid");
-			//		throw new Exception("Username or password invalid");
-			//	}
-			//}
-			//else
-			//{
-			//	_log.Debug("Other Error");
-			//	throw new Exception("Other Error");
-			//}
 		}
 
 		private void RunApplication()
@@ -255,12 +243,6 @@ namespace HSPI_MelcloudClimate
 				RefreshDevices();
 
 				_log.Debug("Starting a loop timer");
-
-				//timer = new System.Timers.Timer();
-				//timer.Interval = _iniSettings.CheckMelCloudTimerIntervalInMilliseconds;
-				//timer.Elapsed += OnTimedEvent;
-				//timer.AutoReset = true;
-				//timer.Enabled = true;
 
 			}
 			catch (Exception ex)
