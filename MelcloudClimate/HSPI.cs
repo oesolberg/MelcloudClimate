@@ -8,9 +8,11 @@ using HSPI_MelcloudClimate.Libraries.Devices;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Threading;
 using HomeSeerAPI;
 using HSPI_MelcloudClimate.Common;
 using HSPI_MelcloudClimate.ConfigPage;
+using HSPI_MelcloudClimate.Handlers;
 using HSPI_MelcloudClimate.Libraries;
 using HSPI_MelcloudClimate.Libraries.Logs;
 using HSPI_MelcloudClimate.Libraries.Settings;
@@ -28,22 +30,23 @@ namespace HSPI_MelcloudClimate
 		private dynamic JsonCommand = new Dictionary<string, JObject>();
 		private static System.Timers.Timer timer;
 		private object pedData = 0;
-		private RestClient client = new RestClient("https://app.melcloud.com/Mitsubishi.Wifi.Client/");
+		private RestClient _client = new RestClient("https://app.melcloud.com/Mitsubishi.Wifi.Client/");
 		private ILog _log;
 		public static bool bShutDown = false;
 		private Setting _settings;
 		private GeneralConfig _config;
-		protected IIniSettings _iniSettings;
+		private IIniSettings _iniSettings;
+		private IRestHandler _restHandler;
 
 		//public LogType LOG_TYPE_INFO { get; private set; }
 		//public LogType LOG_TYPE_ERROR { get; private set; }
 
 		protected override string GetName()
 		{
-			return MelCloudPluginName;
+			return Utility.PluginName;
 		}
 
-		public string MelCloudPluginName => "MelcloudClimate";
+		//public string MelCloudPluginName => "MelcloudClimate";
 
 		protected override bool GetHscomPort()
 		{
@@ -106,18 +109,24 @@ namespace HSPI_MelcloudClimate
 			_log = new Log(HS, _iniSettings);
 
 			_log.Info("Starting plugin");
-			_config = new GeneralConfig(HS, Callback, MelCloudPluginName,_iniSettings,_log);
+			_config = new GeneralConfig(HS, Callback, Utility.PluginName, _iniSettings, _log);
 			_config.Register();
 
 			_settings = new Setting(HS);
-			_settings.DoInifileTemplateIfFileMissing();
+			_settings.DoIniFileTemplateIfFileMissing();
+
+			_restHandler = new RestHandler(_log);
+
+			SetTimer();
+
+			StartLoginAndDataFetchingInNewThread();
 
 			try
 			{
 				//if (!Debugger.IsAttached)//Added to not run application when debugging 
 				{
 					Login(); //Login to the system
-					var runningTask=Task.Run((Action)RunApplication);
+					var runningTask = Task.Run((Action)RunApplication);
 				}
 			}
 			catch (Exception ex)
@@ -130,6 +139,26 @@ namespace HSPI_MelcloudClimate
 			Shutdown = false;
 			return "";
 		}
+
+		private void StartLoginAndDataFetchingInNewThread()
+		{
+
+			//_workThread = new Thread(DoWork) { Name = GetPortAsString() };
+			//_workThread.Start();
+
+		}
+
+		private void SetTimer()
+		{
+			//Setting timer 
+			_log.Debug($"Setting timer with {_iniSettings.CheckMelCloudTimerInterval} seconds interval");
+			timer = new System.Timers.Timer();
+			timer.Interval = _iniSettings.CheckMelCloudTimerIntervalInMilliseconds;
+			timer.Elapsed += OnTimedEvent;
+			timer.AutoReset = true;
+			timer.Enabled = true;
+		}
+
 
 		public override void ShutdownIO()
 		{
@@ -145,32 +174,16 @@ namespace HSPI_MelcloudClimate
 		{
 			_log.Info("Logging in to melcloud");
 
-			ContextKey = null; //Reset context key
-			IRestResponse response = null; //Reset response if it would be set
-
-			var melcloudEmail = _iniSettings.UserNameMelCloud;
-			var melcloudPassword = _iniSettings.PasswordMelCloud;
-
-			try
+			if (!_iniSettings.PasswordAndUsernameOk())
 			{
-				var request = new RestRequest("Login/ClientLogin", Method.POST);
-				request.AddHeader("Accept", "application/json");
-				request.RequestFormat = DataFormat.Json;
-				request.Parameters.Clear();
-				request.AddJsonBody(new { Email = melcloudEmail, Password = melcloudPassword, Language = 0, AppVersion = "1.16.1.2", Persist = "false", CaptchaResponse = "" });
-				response = client.Execute(request);
-				_log.Debug(response.Content);
-			}
-			catch (Exception ex)
-			{
-				_log.Info("Could not login to Melcloud" + ex);
+				return;
 			}
 
-			if ((int)response.StatusCode == 200)
+			var result = _restHandler.DoLogin(_iniSettings.UserNameMelCloud, _iniSettings.PasswordMelCloud);
+
+			if (result.Success)
 			{
-				_log.Debug("Got a successful response from melcloud");
-				
-				dynamic data = JsonConvert.DeserializeObject(response.Content); //Convert data
+				dynamic data = JsonConvert.DeserializeObject(result.ResponseContent); //Convert data
 
 				if (data.ContainsKey("ErrorId") && data.ErrorId == null)
 				{
@@ -181,14 +194,59 @@ namespace HSPI_MelcloudClimate
 				else
 				{
 					_log.Debug("Username or password invalid");
-					throw new Exception("Username or password invalid");
+
 				}
 			}
 			else
 			{
-				_log.Debug("Other Error");
-				throw new Exception("Other Error");
+				_log.Info($"Could not login to Melcloud : {result.Error}");
 			}
+
+			//ContextKey = null; //Reset context key
+			//IRestResponse response = null; //Reset response if it would be set
+
+			//var melcloudEmail = _iniSettings.UserNameMelCloud;
+			//var melcloudPassword = _iniSettings.PasswordMelCloud;
+
+			//try
+			//{
+			//	var request = new RestRequest("Login/ClientLogin", Method.POST);
+			//	request.AddHeader("Accept", "application/json");
+			//	request.RequestFormat = DataFormat.Json;
+			//	request.Parameters.Clear();
+			//	request.AddJsonBody(new { Email = melcloudEmail, Password = melcloudPassword, Language = 0, AppVersion = "1.16.1.2", Persist = "false", CaptchaResponse = "" });
+			//	response = _client.Execute(request);
+			//	_log.Debug(response.Content);
+			//}
+			//catch (Exception ex)
+			//{
+			//	_log.Info("Could not login to Melcloud" + ex);
+
+			//}
+
+			//if ((int)response.StatusCode == 200)
+			//{
+			//	_log.Debug("Got a successful response from melcloud");
+
+			//	dynamic data = JsonConvert.DeserializeObject(response.Content); //Convert data
+
+			//	if (data.ContainsKey("ErrorId") && data.ErrorId == null)
+			//	{
+			//		_log.Debug("Seems like a login was successful");
+			//		ContextKey = data.LoginData.ContextKey;
+			//		_log.Info("Successfully logged in to Melcloud");
+			//	}
+			//	else
+			//	{
+			//		_log.Debug("Username or password invalid");
+			//		throw new Exception("Username or password invalid");
+			//	}
+			//}
+			//else
+			//{
+			//	_log.Debug("Other Error");
+			//	throw new Exception("Other Error");
+			//}
 		}
 
 		private void RunApplication()
@@ -202,11 +260,11 @@ namespace HSPI_MelcloudClimate
 
 				_log.Debug("Starting a loop timer");
 
-				timer = new System.Timers.Timer();
-				timer.Interval = _iniSettings.CheckMelCloudTimerIntervalInMilliseconds;
-				timer.Elapsed += OnTimedEvent;
-				timer.AutoReset = true;
-				timer.Enabled = true;
+				//timer = new System.Timers.Timer();
+				//timer.Interval = _iniSettings.CheckMelCloudTimerIntervalInMilliseconds;
+				//timer.Elapsed += OnTimedEvent;
+				//timer.AutoReset = true;
+				//timer.Enabled = true;
 
 			}
 			catch (Exception ex)
@@ -221,6 +279,8 @@ namespace HSPI_MelcloudClimate
 		{
 			_log.Debug($"Raised: {e.SignalTime}");
 
+			if (_restHandler.NoContext) return;
+			;
 
 			//Periodical run system check
 			//First check if its local changes to save to cloud
@@ -262,7 +322,7 @@ namespace HSPI_MelcloudClimate
 			}
 					.addPED("DeviceId", deviceId)
 					.addPED("Type", "State")
-					
+
 					.CheckAndCreate(powerState)
 					.AddButton(1, "On", $"images/HomeSeer/contemporary/on.gif")
 					.AddButton(0, "Off", $"images/HomeSeer/contemporary/off.gif");
@@ -399,28 +459,31 @@ namespace HSPI_MelcloudClimate
 					_log.Debug("Waiting for changes, abort this update");
 					break;
 				}
+				var deviceId = pair.Value.GetValue("DeviceID");
+				var buildingId = pair.Value.GetValue("BuildingId");
+				var result = _restHandler.DoDeviceGet(deviceId, buildingId);
 
+				//_client = new RestClient("https://app.melcloud.com/Mitsubishi.Wifi.Client/");
+				//_log.Debug("Updating devices");
+				////req = requests.get("https://app.melcloud.com/Mitsubishi.Wifi.Client/Device/Get", headers = { 'X-MitsContextKey': self._authentication.getContextKey()}, data = { 'id': self._deviceid, 'buildingID': self._buildingid})
+				////{ "id": "112833", "buildingID": "57359"}
+				//var request = new RestRequest("Device/Get", Method.GET);
+				//request.AddHeader("Accept", "application/json");
+				//request.AddHeader("X-MitsContextKey", ContextKey.ToString());
+				//request.AddHeader("Content-Type", "application/json");
+				//request.RequestFormat = DataFormat.Json;
+				////request.Parameters.Clear();
+				//dynamic RequestBody = new JObject();
+				//RequestBody.id = pair.Value.GetValue("DeviceID");
+				//RequestBody.buildingID = pair.Value.GetValue("BuildingId");
 
-				client = new RestClient("https://app.melcloud.com/Mitsubishi.Wifi.Client/");
-				_log.Debug("Updating devices");
-				//req = requests.get("https://app.melcloud.com/Mitsubishi.Wifi.Client/Device/Get", headers = { 'X-MitsContextKey': self._authentication.getContextKey()}, data = { 'id': self._deviceid, 'buildingID': self._buildingid})
-				//{ "id": "112833", "buildingID": "57359"}
-				var request = new RestRequest("Device/Get", Method.GET);
-				request.AddHeader("Accept", "application/json");
-				request.AddHeader("X-MitsContextKey", ContextKey.ToString());
-				request.AddHeader("Content-Type", "application/json");
-				request.RequestFormat = DataFormat.Json;
-				//request.Parameters.Clear();
-				dynamic RequestBody = new JObject();
-				RequestBody.id = pair.Value.GetValue("DeviceID");
-				RequestBody.buildingID = pair.Value.GetValue("BuildingId");
+				//request.AddParameter("id", pair.Value.GetValue("DeviceID"));
+				//request.AddParameter("buildingID", pair.Value.GetValue("BuildingId"));
 
-				request.AddParameter("id", pair.Value.GetValue("DeviceID"));
-				request.AddParameter("buildingID", pair.Value.GetValue("BuildingId"));
+				//IRestResponse response = _client.Execute(request);
+				//_log.Debug(response.Content);
 
-				IRestResponse response = client.Execute(request);
-				_log.Debug(response.Content);
-				dynamic deviceResponse = JObject.Parse(response.Content);
+				dynamic deviceResponse = JObject.Parse(result.ResponseContent);
 
 				//Update fields
 
@@ -557,20 +620,21 @@ namespace HSPI_MelcloudClimate
 			JsonCommand[deviceId.ToString()].HasPendingCommand = true;
 			JsonCommand[deviceId.ToString()].EffectiveFlags = 0x1F;
 
+			RestHandlerResult result = _restHandler.UpdateDevice(JsonCommand[deviceId.ToString()].ToString());
 			//TODO share this
-			client = new RestClient("https://app.melcloud.com/Mitsubishi.Wifi.Client/");
+			//_client = new RestClient("https://app.melcloud.com/Mitsubishi.Wifi.Client/");
 
-			var request = new RestRequest("Device/SetAta", Method.POST);
-			request.AddHeader("Accept", "application/json");
-			request.AddHeader("X-MitsContextKey", ContextKey.ToString());
-			request.RequestFormat = DataFormat.Json;
-			request.AddJsonBody(JsonCommand[deviceId.ToString()].ToString());
+			//var request = new RestRequest("Device/SetAta", Method.POST);
+			//request.AddHeader("Accept", "application/json");
+			//request.AddHeader("X-MitsContextKey", ContextKey.ToString());
+			//request.RequestFormat = DataFormat.Json;
+			//request.AddJsonBody(JsonCommand[deviceId.ToString()].ToString());
 
-			IRestResponse response = client.Execute(request);
+			//IRestResponse response = _client.Execute(request);
 			_log.Debug("Tried to save: " + JsonCommand[deviceId.ToString()].ToString());
-			_log.Debug(response.Content);
-
-			JsonCommand[deviceId.ToString()].HasPendingCommand = false; //Reset pending changes
+			//_log.Debug(response.Content);
+			if (result.Success)
+				JsonCommand[deviceId.ToString()].HasPendingCommand = false; //Reset pending changes
 
 			return true;
 		}
@@ -587,19 +651,20 @@ namespace HSPI_MelcloudClimate
 
 			try
 			{
-				var request = new RestRequest("User/ListDevices", Method.GET);
-				request.AddHeader("Accept", "application/json");
-				request.AddHeader("X-MitsContextKey", ContextKey.ToString());
-				request.RequestFormat = DataFormat.Json;
+				var result = _restHandler.DoDeviceListing();
 
-				IRestResponse response = client.Execute(request);
+				//var request = new RestRequest("User/ListDevices", Method.GET);
+				//request.AddHeader("Accept", "application/json");
+				//request.AddHeader("X-MitsContextKey", ContextKey.ToString());
+				//request.RequestFormat = DataFormat.Json;
 
-				_log.Debug(response.Content);
+				//IRestResponse response = _client.Execute(request);
 
-				if ((int)response.StatusCode == 200)
+				_log.Debug(result.ResponseContent);
+				if (result.Success)
 				{
 					_log.Debug("Got a successful response from melcloud");
-					dynamic data = JsonConvert.DeserializeObject(response.Content); //Convert data
+					dynamic data = JsonConvert.DeserializeObject(result.ResponseContent); //Convert data
 
 					//Process all Floor devices
 					_log.Debug("Process all devices pr floor");

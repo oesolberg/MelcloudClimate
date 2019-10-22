@@ -2,9 +2,9 @@ using HomeSeerAPI;
 
 namespace HSPI_MelcloudClimate.Libraries.Settings
 {
-	public class Setting : Library
+	public class Setting 
 	{
-		public new IHSApplication _hs;
+		public readonly IHSApplication _hs;
 
 		public const string InifileName = "MelcloudClimate.ini";
 		public const string UserSection = "User";
@@ -12,20 +12,10 @@ namespace HSPI_MelcloudClimate.Libraries.Settings
 		public const string MelcloudPassword = "Password";
 
 
-		public Setting(IHSApplication HS)
+		public Setting(IHSApplication hs)
 		{
-			_hs = HS;
+			_hs = hs;
 		}
-
-		public bool IsTesting
-		{
-			get
-			{
-				var temp = _hs.GetINISetting(UserSection, MelcloudUserName, "false", InifileName);
-				return bool.TryParse(temp,out var isTesting) ? isTesting : isTesting;
-			}
-		}
-
 
 		public string GetEmail()
 		{
@@ -33,7 +23,7 @@ namespace HSPI_MelcloudClimate.Libraries.Settings
 			return userName;
 		}
 
-		public void DoInifileTemplateIfFileMissing()
+		public void DoIniFileTemplateIfFileMissing()
 		{
 			if (!InifileExists())
 			{

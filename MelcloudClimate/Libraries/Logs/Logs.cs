@@ -11,13 +11,14 @@ namespace HSPI_MelcloudClimate.Libraries.Logs
 		void Error(string msg);
 		}
 	
-	public class Log : Library, ILog
+	public class Log : ILog
 	{
-		public new IHSApplication _hs;
+		private IHSApplication _hs;
+		private IIniSettings _iniSettings;
 
-		public Log(IHSApplication HS, IIniSettings iniSettings)
+		public Log(IHSApplication hs, IIniSettings iniSettings)
 		{
-			_hs = HS;
+			_hs = hs;
 			_iniSettings = iniSettings;
 		}
 
@@ -29,7 +30,7 @@ namespace HSPI_MelcloudClimate.Libraries.Logs
 			{
 				if (msg == null)
 					msg = "";
-				_hs.WriteLog(GetName() + " Debug", msg);
+				_hs.WriteLog(Utility.PluginName + " Debug", msg);
 				Console.WriteLine($"Debug: {msg}");
 			}
 		}
@@ -41,7 +42,7 @@ namespace HSPI_MelcloudClimate.Libraries.Logs
 				if (msg == null)
 					msg = "";
 
-				_hs.WriteLog(GetName() + " Info", msg);
+				_hs.WriteLog(Utility.PluginName + " Info", msg);
 
 				Console.WriteLine($"Info: {msg}");
 			}
@@ -52,7 +53,7 @@ namespace HSPI_MelcloudClimate.Libraries.Logs
 			if (msg == null)
 				msg = "";
 
-			_hs.WriteLog(GetName() + " Error", msg);
+			_hs.WriteLog(Utility.PluginName + " Error", msg);
 
 			Console.WriteLine($"Error: {msg}");
 		}

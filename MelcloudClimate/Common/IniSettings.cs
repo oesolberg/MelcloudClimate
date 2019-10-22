@@ -15,11 +15,12 @@ namespace HSPI_MelcloudClimate.Common
 		int CheckMelCloudTimerInterval { get; set; }
 
 		string UserNameMelCloud { get; set; }
-		string PasswordMelCloud{ get; set; }
+		string PasswordMelCloud { get; set; }
 		double CheckMelCloudTimerIntervalInMilliseconds { get; }
 
 		event IniSettingsChangedEventHandler IniSettingsChanged;
 
+		bool PasswordAndUsernameOk();
 	}
 
 	public class IniSettings : IIniSettings, IDisposable
@@ -36,7 +37,7 @@ namespace HSPI_MelcloudClimate.Common
 		private readonly IHSApplication _hs;
 
 		private bool _disposed;
-		private LogLevel _logLevel;
+		private LogLevel _logLevel = LogLevel.Debug;
 
 		private int _checkTriggerTimerInterval;
 		private string _msAppId;
@@ -83,11 +84,17 @@ namespace HSPI_MelcloudClimate.Common
 		{
 
 			_hs.SaveINISetting(UserSection, UserNameKey, _userName, Utility.IniFile);
-				OnIniSettingsChanged();
+			OnIniSettingsChanged();
 		}
 
 		public double CheckMelCloudTimerIntervalInMilliseconds => _checkTriggerTimerInterval * 1000;
 		public event IniSettingsChangedEventHandler IniSettingsChanged;
+		public bool PasswordAndUsernameOk()
+		{
+			if (!string.IsNullOrEmpty(_password) && !string.IsNullOrEmpty(_userName))
+				return true;
+			return false;
+		}
 
 		public int CheckMelCloudTimerInterval
 		{
@@ -118,7 +125,7 @@ namespace HSPI_MelcloudClimate.Common
 			var checkTriggerTimerIntervalString = _hs.GetINISetting(ConfigSection, CheckMelCloudIntervalKey, "", Utility.IniFile);
 			if (int.TryParse(checkTriggerTimerIntervalString, out var tempInterval))
 			{
-				if(tempInterval>0)
+				if (tempInterval > 0)
 					return tempInterval;
 			}
 			//return tempInterval;
@@ -138,13 +145,13 @@ namespace HSPI_MelcloudClimate.Common
 
 		private string LoadPassword()
 		{
-			_password= _hs.GetINISetting(UserSection, PasswordKey, "", Utility.IniFile);
+			_password = _hs.GetINISetting(UserSection, PasswordKey, "", Utility.IniFile);
 			return _password;
 		}
 
 		private LogLevel LoadLogLevel()
 		{
-			var debugLevelAsString = _hs.GetINISetting(ConfigSection, LogLevelKey, "NONE", Utility.IniFile);
+			var debugLevelAsString = _hs.GetINISetting(ConfigSection, LogLevelKey, "Debug", Utility.IniFile);
 			LogLevel logLevelToReturn;
 			if (!Enum.TryParse(debugLevelAsString, true, out logLevelToReturn))
 			{

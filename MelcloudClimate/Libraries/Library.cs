@@ -12,8 +12,6 @@ namespace HSPI_MelcloudClimate.Libraries
      
         public Setting Setting;
         public IHSApplication _hs;
-      
-
  
 
 
