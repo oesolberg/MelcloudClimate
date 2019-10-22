@@ -30,7 +30,6 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
 
 		public Device AddStatusField(int startValue, int endValue, string suffix, bool includeValues = true, string graphicsPath = null)
 		{
-
 			var vsPair = new VSVGPairs.VSPair(ePairStatusControl.Status)
 			{
 				PairType = VSVGPairs.VSVGPairType.Range,
@@ -38,15 +37,12 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
 				RangeEnd = endValue,
 				RangeStatusSuffix = suffix,
 				IncludeValues = includeValues
-
 			};
 
 			_hs.DeviceVSP_AddPair(Id, vsPair);
 
 			if (graphicsPath != null)
 				AddStatusGraphicField(startValue, endValue, graphicsPath);
-
-
 			return this;
 		}
 
@@ -59,41 +55,25 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
 				RangeEnd = endValue,
 				RangeStatusSuffix = suffix,
 				IncludeValues = includeValues,
-
-
-
 			};
 
 			_hs.DeviceVSP_AddPair(Id, vsPair);
 
 			if (graphicsPath != null)
 				AddStatusGraphicField(startValue, endValue, graphicsPath);
-
-
 			return this;
 		}
 
 
 		public Device AddButton(double value, string status, string graphicsPath = null)
 		{
-
-
-
-
-
 			var vsPair = new VSVGPairs.VSPair(ePairStatusControl.Both)
 			{
 				PairType = VSVGPairs.VSVGPairType.SingleValue,
 				Value = value,
 				Status = status,
 				Render = Enums.CAPIControlType.Button
-
-
-
-
 			};
-
-
 
 			_hs.DeviceVSP_AddPair(Id, vsPair);
 
@@ -114,16 +94,9 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
 				RangeEnd = endValue,
 				RangeStatusSuffix = suffix,
 				Render = Enums.CAPIControlType.ValuesRange
-
-
-
-
 			};
 
-
-
 			_hs.DeviceVSP_AddPair(Id, vsPair);
-
 
 			if (graphicsPath != null)
 				AddStatusGraphicField(startValue, endValue, graphicsPath);
@@ -131,31 +104,16 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
 			return this;
 		}
 
-
-
 		public Device AddStatusControlSingleField(double value, string status, string graphicsPath = null, bool button = false)
 		{
-
-
-
-
-
 			var vsPair = new VSVGPairs.VSPair(ePairStatusControl.Both)
 			{
 				PairType = VSVGPairs.VSVGPairType.SingleValue,
 				Value = value,
 				Status = status,
-
-
-
-
 			};
 
-
-
 			_hs.DeviceVSP_AddPair(Id, vsPair);
-
-
 
 			return this;
 		}
@@ -187,17 +145,19 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
 
 				_hs.DeviceVGP_AddPair(Id, vgPair);
 			}
-
-
-
-
 			return this;
 		}
 
-		public void SetValue(double value)
+		public Device SetValue(double value)
 		{
-			_hs.SetDeviceValueByRef(Id, value, false);
+			_hs.SetDeviceValueByRef(Id, value, true);
+			return this;
+		}
 
+		public Device SetText(string text)
+		{
+			_hs.SetDeviceString(Id,text,false);
+			return this;
 		}
 
 
@@ -242,7 +202,6 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
 		{
 			return this;
 		}
-
 
 	}
 }

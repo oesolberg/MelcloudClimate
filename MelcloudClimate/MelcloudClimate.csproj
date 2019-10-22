@@ -125,11 +125,16 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Common\Constants.cs" />
     <Compile Include="Common\LogLevel.cs" />
     <Compile Include="Common\DelegateDummy.cs" />
     <Compile Include="Common\Utility.cs" />
+    <Compile Include="ConfigPage\AboutPage.cs" />
+    <Compile Include="ConfigPage\ConfigHandler.cs" />
     <Compile Include="ConfigPage\GeneralConfig.cs" />
+    <Compile Include="ConfigPage\IConfigPage.cs" />
     <Compile Include="Handlers\RestHandler.cs" />
+    <Compile Include="Handlers\RestHandlerResult.cs" />
     <Compile Include="HSPI.cs" />
     <Compile Include="Common\IniSettings.cs" />
     <Compile Include="Libraries\Devices\DeviceFinalHelpers.cs" />

@@ -8,15 +8,17 @@ using Scheduler;
 
 namespace HSPI_MelcloudClimate.ConfigPage
 {
-	public class GeneralConfig : PageBuilderAndMenu.clsPageBuilder
+	public class GeneralConfig : PageBuilderAndMenu.clsPageBuilder, IConfigPage
 	{
 		private readonly IHSApplication _hs;
 		private IAppCallbackAPI _callback;
 		private readonly IIniSettings _iniSettings;
-		private string _pluginName;
+		//private string _pluginName;
 		private ILog _log;
+		private readonly string _pageName;
+
 		private const string IdKey = "id";
-		private const string _pageName = "MelCloud_General_Config";
+		//private const string _pageName = "MelCloud_General_Config";
 		private const string _pageNameText = "General Config";
 
 		private const string LogLevelKey = "LogLevelKey";
@@ -24,12 +26,12 @@ namespace HSPI_MelcloudClimate.ConfigPage
 		private const string UserNameKey = "UserNameKey";
 		private const string PasswordKey = "PasswordKey";
 
-		public GeneralConfig(IHSApplication hs, IAppCallbackAPI callback, 
-			string pluginName, IIniSettings iniSettings, ILog log) : base(_pageName)
+		public GeneralConfig(string pageName,IHSApplication hs, IAppCallbackAPI callback, 
+			 IIniSettings iniSettings, ILog log) : base(pageName)
 		{
+			_pageName = pageName;
 			_hs = hs;
 			_callback = callback;
-			_pluginName = pluginName;
 			_iniSettings = iniSettings;
 			_log = log;
 		}
@@ -38,29 +40,31 @@ namespace HSPI_MelcloudClimate.ConfigPage
 		{
 			Scheduler.PageBuilderAndMenu.clsPageBuilder pageToRegister;
 
-			_hs.RegisterPage(_pageName, _pluginName, _pluginName);
+			_hs.RegisterPage(_pageName, Utility.PluginName, Utility.InstanceFriendlyName);
 
 			var linkText = _pageName;
-			linkText = linkText.Replace("MelCloud_", "").Replace("_", " ").Replace(_pluginName, "");
+			linkText = linkText.Replace("MelCloud_", "").Replace("_", " ").Replace(Utility.PluginName, "");
 			var pageTitle = linkText;
 
 			var wpd = new WebPageDesc
 			{
 				link = _pageName,
-				plugInName = _pluginName
+				plugInName = Utility.PluginName
 			};
 			_callback.RegisterConfigLink(wpd);
 
 			var webPageDescription = new WebPageDesc
 			{
-				plugInName = _pluginName,
+				plugInName = Utility.PluginName,
 				link = _pageName,
 				linktext = pageTitle,
 				page_title = pageTitle
 			};
-			_hs.RegisterPage(_pageName, _pluginName, string.Empty);
+			_hs.RegisterPage(_pageName, Utility.PluginName, string.Empty);
 			_callback.RegisterLink(webPageDescription);
 		}
+
+		public new string PageName => _pageName;
 
 		public string GetPagePlugin(string page, string user, int userRights, string queryString)
 		{
@@ -69,7 +73,7 @@ namespace HSPI_MelcloudClimate.ConfigPage
 			var returnString = new StringBuilder();
 
 			returnString.Append("<title>" + _pageNameText + "</title>");
-			returnString.Append(_hs.GetPageHeader(_pageName, _pluginName, "", "", false, false));
+			returnString.Append(_hs.GetPageHeader(_pageName, Utility.PluginName, "", "", false, false));
 			//' a message area for error messages from jquery ajax post back (optional, only needed if using AJAX calls to get data)
 			returnString.Append(PageBuilderAndMenu.clsPageBuilder.DivStart("pluginpage", ""));
 			returnString.Append(PageBuilderAndMenu.clsPageBuilder.DivStart("errormessage", "class='errormessage'"));
@@ -92,7 +96,7 @@ namespace HSPI_MelcloudClimate.ConfigPage
 			returnString.Append("<strong><div id=\'message\'>&nbsp;</div></strong><br/>");
 			returnString.Append(" <table border='0' cellpadding='0' cellspacing='0' width='1000'>");
 			returnString.Append("  <tr class='tableheader'><td width='250'>" + _pageNameText + "</td><td width='750'>" +
-								$"General settings for {_pluginName}" + "</td></tr>");
+								$"General settings for {Utility.PluginName}" + "</td></tr>");
 			
 			//Set user name
 			returnString.Append("  <tr class='tablerowodd'><td>User name:</td><td>" +

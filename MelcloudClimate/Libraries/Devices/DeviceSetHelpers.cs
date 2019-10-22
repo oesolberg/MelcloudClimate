@@ -9,7 +9,7 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
             
         }
 
-        public Device addPED(string Key, dynamic Value)
+        public Device AddPED(string Key, dynamic Value)
         {
             if (PEDStorage.ContainsKey(Key) == false) {
                 //Key does not exist

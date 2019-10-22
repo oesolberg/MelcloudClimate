@@ -5,5 +5,6 @@
 
 		public const string IniFile = "MelcloudClimate.ini";
 		public static string PluginName => "MelcloudClimate";
+		public static string InstanceFriendlyName => string.Empty;
 	}
 }
