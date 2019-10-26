@@ -37,7 +37,8 @@ namespace HSPI_MelcloudClimate.ConfigPage
 			returnString.Append("<br/>Moskus at <a href=\"https://www.hjemmeautomasjon.no\" target=\"_blank\">www.hjemmeautomasjon.no</a>");
 			returnString.Append("<br/>");
 
-			returnString.Append("<br/>Testers: Hr Kotelett");
+			returnString.Append("<br/>Testers: ");
+			returnString.Append("<br/>fjaeran at <a href=\"https://www.hjemmeautomasjon.no\" target=\"_blank\">www.hjemmeautomasjon.no</a>");
 			returnString.Append("<br/>");
 
 			//returnString.Append("<br/>Icons from ");

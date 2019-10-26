@@ -70,11 +70,20 @@
     <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.12.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
+    <Reference Include="Polly, Version=7.0.0.0, Culture=neutral, PublicKeyToken=c8a3ffc3f8f825cc, processorArchitecture=MSIL">
+      <HintPath>..\packages\Polly.7.1.1\lib\netstandard2.0\Polly.dll</HintPath>
+    </Reference>
     <Reference Include="RestSharp, Version=106.6.5.0, Culture=neutral, PublicKeyToken=598062e77f915f75, processorArchitecture=MSIL">
       <HintPath>..\packages\RestSharp.106.6.5\lib\net452\RestSharp.dll</HintPath>
     </Reference>
     <Reference Include="Scheduler, Version=3.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\homeseer.1.2.8\lib\net45\Scheduler.dll</HintPath>
+    </Reference>
+    <Reference Include="Serilog, Version=2.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\packages\Serilog.2.5.0\lib\net46\Serilog.dll</HintPath>
+    </Reference>
+    <Reference Include="Serilog.Sinks.File, Version=2.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\packages\Serilog.Sinks.File.4.1.0\lib\net45\Serilog.Sinks.File.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
@@ -125,6 +134,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Common\SystemTime.cs" />
     <Compile Include="Common\Constants.cs" />
     <Compile Include="Common\LogLevel.cs" />
     <Compile Include="Common\DelegateDummy.cs" />
@@ -133,6 +143,7 @@
     <Compile Include="ConfigPage\ConfigHandler.cs" />
     <Compile Include="ConfigPage\GeneralConfig.cs" />
     <Compile Include="ConfigPage\IConfigPage.cs" />
+    <Compile Include="Handlers\DeviceHandler.cs" />
     <Compile Include="Handlers\RestHandler.cs" />
     <Compile Include="Handlers\RestHandlerResult.cs" />
     <Compile Include="HSPI.cs" />
@@ -143,7 +154,7 @@
     <Compile Include="Libraries\Devices\Devices.cs" />
     <Compile Include="Libraries\Devices\DeviceSetHelpers.cs" />
     <Compile Include="Libraries\Library.cs" />
-    <Compile Include="Libraries\Logs\Logs.cs" />
+    <Compile Include="Libraries\Logs\Log.cs" />
     <Compile Include="Libraries\Settings\Settings.cs" />
     <Compile Include="Libraries\WebPages\WebPage.cs" />
     <Compile Include="Program.cs" />

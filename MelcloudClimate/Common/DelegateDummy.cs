@@ -2,11 +2,10 @@
 
 namespace HSPI_MelcloudClimate.Common
 {
-	//public delegate void GCalSeerConnectionChangedEventHandler(Object sender, GcalEventArgs eventArgs);
 
-	//public delegate void GCalSeerEventDataUpdatedEventHandler(Object sender, EventArgs eventArgs);
-
-	public delegate void IniSettingsChangedEventHandler(Object sender, EventArgs eventArgs);
+	public delegate void IniSettingsChangedForUserNamePasswordEventHandler(Object sender, EventArgs eventArgs);
+	public delegate void IniSettingsChangedForCheckIntervalEventHandler(Object sender, EventArgs eventArgs);
+	public delegate void IniSettingsChangedForLogLevelEventHandler(Object sender, EventArgs eventArgs);
 
 	public class DelegateDummy
 	{

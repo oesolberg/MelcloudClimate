@@ -18,7 +18,9 @@ namespace HSPI_MelcloudClimate.Common
 		string PasswordMelCloud { get; set; }
 		double CheckMelCloudTimerIntervalInMilliseconds { get; }
 
-		event IniSettingsChangedEventHandler IniSettingsChanged;
+		event IniSettingsChangedForUserNamePasswordEventHandler IniSettingsChangedForUserNamePassword;
+		event IniSettingsChangedForCheckIntervalEventHandler IniSettingsChangedForCheckInterval;
+		event IniSettingsChangedForLogLevelEventHandler IniSettingsChangedForLogLevel;
 
 		bool PasswordAndUsernameOk();
 	}
@@ -59,7 +61,7 @@ namespace HSPI_MelcloudClimate.Common
 			{
 				_password = value;
 				SavePasswordMelcloud();
-				OnIniSettingsChanged();
+				OnIniSettingsChangedForUserNameAndPassword();
 			}
 		}
 
@@ -70,25 +72,26 @@ namespace HSPI_MelcloudClimate.Common
 			{
 				_userName = value;
 				SaveUserNameMelcloud();
-				OnIniSettingsChanged();
+				OnIniSettingsChangedForUserNameAndPassword();
 			}
 		}
 
 		private void SavePasswordMelcloud()
 		{
 			_hs.SaveINISetting(UserSection, PasswordKey, _password, Utility.IniFile);
-			OnIniSettingsChanged();
 		}
 
 		private void SaveUserNameMelcloud()
 		{
 
 			_hs.SaveINISetting(UserSection, UserNameKey, _userName, Utility.IniFile);
-			OnIniSettingsChanged();
 		}
 
 		public double CheckMelCloudTimerIntervalInMilliseconds => _checkTriggerTimerInterval * 1000;
-		public event IniSettingsChangedEventHandler IniSettingsChanged;
+		public event IniSettingsChangedForUserNamePasswordEventHandler IniSettingsChangedForUserNamePassword;
+		public event IniSettingsChangedForCheckIntervalEventHandler IniSettingsChangedForCheckInterval;
+		public event IniSettingsChangedForLogLevelEventHandler IniSettingsChangedForLogLevel;
+
 		public bool PasswordAndUsernameOk()
 		{
 			if (!string.IsNullOrEmpty(_password) && !string.IsNullOrEmpty(_userName))
@@ -103,13 +106,23 @@ namespace HSPI_MelcloudClimate.Common
 			{
 				_checkTriggerTimerInterval = value;
 				SaveCheckTriggerTimerIntervalToIni();
-				OnIniSettingsChanged();
+				OnIniSettingsChangedForCheckInterval();
 			}
 		}
 
-		protected virtual void OnIniSettingsChanged()
+		protected virtual void OnIniSettingsChangedForCheckInterval()
 		{
-			IniSettingsChanged?.Invoke(this, EventArgs.Empty);
+			IniSettingsChangedForCheckInterval?.Invoke(this, EventArgs.Empty);
+		}
+
+		protected virtual void OnIniSettingsChangedForUserNameAndPassword()
+		{
+			IniSettingsChangedForUserNamePassword?.Invoke(this, EventArgs.Empty);
+		}
+
+		protected virtual void OnIniSettingsChangedForLogLevel()
+		{
+			IniSettingsChangedForLogLevel?.Invoke(this, EventArgs.Empty);
 		}
 
 		public void LoadSettingsFromIniFile()
@@ -167,7 +180,7 @@ namespace HSPI_MelcloudClimate.Common
 			{
 				_logLevel = value;
 				SaveLogLevel();
-				OnIniSettingsChanged();
+				OnIniSettingsChangedForLogLevel();
 			}
 		}
 
@@ -232,7 +245,6 @@ namespace HSPI_MelcloudClimate.Common
 			var logLevelToSave = Enum.GetName(typeof(LogLevel), _logLevel);
 
 			_hs.SaveINISetting(ConfigSection, LogLevelKey, logLevelToSave, Utility.IniFile);
-			OnIniSettingsChanged();
 		}
 
 		public void Dispose()

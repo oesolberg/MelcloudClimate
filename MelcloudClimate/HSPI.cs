@@ -22,22 +22,22 @@ namespace HSPI_MelcloudClimate
 	// ReSharper disable once InconsistentNaming
 	public class HSPI : HspiBase
 	{
-		protected string Location = "MelcloudClimate";
-		protected string Location2 = "MelcloudClimate";
-		private dynamic ContextKey;
-		//private System.Collections.Generic.List<Device> ClimateDevices;
 		private dynamic ClimateDevices = new Dictionary<string, Dictionary<string, Device>>();
 		private dynamic JsonCommand = new Dictionary<string, JObject>();
 		private static System.Timers.Timer _timer;
-		private object pedData = 0;
-		private RestClient _client = new RestClient("https://app.melcloud.com/Mitsubishi.Wifi.Client/");
+		private object _pedData = 0;
 		private ILog _log;
-		public static bool bShutDown = false;
 		private Setting _settings;
-		private GeneralConfig _config;
+		private ConfigHandler _config;
 		private IIniSettings _iniSettings;
 		private IRestHandler _restHandler;
 		private static readonly object LockObject = new object();
+		private IDeviceHandler _deviceHandler;
+		private int _unsuccessfullAttempts;
+		private int _numberOfSuccessfulDataFetches;
+		private DateTime _nextCommunication;
+		private int _notConnectedAttempts;
+		private int _connectedTimes;
 
 		protected override string GetName()
 		{
@@ -67,113 +67,134 @@ namespace HSPI_MelcloudClimate
 
 				//Get the device that did the request
 
-				HS.SetDeviceValueByRef(CC.Ref, CC.ControlValue, false);
+				HS.SetDeviceValueByRef(CC.Ref, CC.ControlValue, true);
 
 				var device = (Scheduler.Classes.DeviceClass)HS.GetDeviceByRef(CC.Ref);
 
 
 				//This is a parent device, use its builtin device id
 				var ped = (PlugExtraData.clsPlugExtraData)device.get_PlugExtraData_Get(HS);
-				pedData = ped.GetNamed("DeviceIdKey");
+				_pedData = ped.GetNamed("DeviceIdKey");
 				var pedType = ped.GetNamed("Type");
 
 
 				if (pedType.ToString() == "Target")
-					SetTemperature(Convert.ToInt32(pedData), Convert.ToInt32(CC.ControlValue));
+					SetTemperature(Convert.ToInt32(_pedData), Convert.ToInt32(CC.ControlValue));
 				else if (pedType.ToString() == "State")
 				{
 					if (CC.ControlValue == 1) //Turn on ac
-						PowerOn(Convert.ToInt32(pedData));
+						PowerOn(Convert.ToInt32(_pedData));
 					else if (CC.ControlValue == 0) //Turn off ac
-						PowerOff(Convert.ToInt32(pedData));
+						PowerOff(Convert.ToInt32(_pedData));
 				}
 				else if (pedType.ToString() == "OperationMode")
-					SetOperationMode(Convert.ToInt32(pedData), Convert.ToInt32(CC.ControlValue));
+					SetOperationMode(Convert.ToInt32(_pedData), Convert.ToInt32(CC.ControlValue));
 				else if (pedType.ToString() == Constants.FanSpeed)
-					SetFanSpeed(Convert.ToInt32(pedData), Convert.ToInt32(CC.ControlValue));
-
-
-
+					SetFanSpeed(Convert.ToInt32(_pedData), Convert.ToInt32(CC.ControlValue));
 			}
 		}
-
 
 		public override string InitIO(string port)
 		{
 			_iniSettings = new IniSettings(HS);
 
-			_iniSettings.IniSettingsChanged += IniSettingsChanged;
+			//_iniSettings.IniSettingsChangedForCheckInterval += IniSettingsChangedForCheckInterval;
+			_iniSettings.IniSettingsChangedForUserNamePassword += IniSettingsChangedForUserNamePassword; ;
 
 			_log = new Log(HS, _iniSettings);
 
 			_log.Info("Starting plugin");
-			_config = new GeneralConfig("MelCloud_General_Config", HS, Callback, _iniSettings, _log);
+			_config = new ConfigHandler( HS, Callback, _iniSettings, _log);
 			_config.Register();
+
+			_deviceHandler=new DeviceHandler(HS,_log);
 
 			_settings = new Setting(HS);
 			_settings.DoIniFileTemplateIfFileMissing();
 
 			_restHandler = new RestHandler(_log);
 
-			
-
 			StartLoginAndDataFetchingInNewThread();
 
-			
-
 			Shutdown = false;
+			_log.Debug("Done init io");
 			return "";
 		}
 
-		private void IniSettingsChanged(object sender, EventArgs eventArgs)
+		private void IniSettingsChangedForUserNamePassword(object sender, EventArgs eventArgs)
 		{
-			//Reset timer
-			_timer.Close();
-
-			//Login with username and password
+			//Do something to login with new username and password
 			Login();
-			if (!_restHandler.NoContext)
-			{
-				SetTimer();
-			}
 		}
+
+		//private void IniSettingsChangedForCheckInterval(object sender, EventArgs eventArgs)
+		//{
+		//	//Reset timer
+		//	_timer.Close();
+
+		//	//Login with username and password
+		//	Login();
+		//	if (!_restHandler.NoContext)
+		//	{
+		//		SetTimer();
+		//	}
+		//}
 
 		private void StartLoginAndDataFetchingInNewThread()
 		{
-			//Run fetching of first data if we can
+			var thread = new Thread(() => StartLoginAndDataFetching());
+			thread.Start();
+			
+		}
 
-			//_workThread = new Thread(DoWork) { Name = GetPortAsString() };
-			//_workThread.Start();
+		private void StartLoginAndDataFetching()
+		{
 			try
 			{
-				//if (!Debugger.IsAttached)//Added to not run application when debugging 
 				{
 					Login(); //Login to the system
+
+					if (_restHandler.IsConnected && _restHandler.IsLoggedIn)
+					{
+						//RunApplication();
+						GetDevices();
+						RefreshDevices();
+						if(_timer==null)
+							SetTimer();
+					}
+
 					if (_restHandler.NoContext)
 					{
-						SetConnectedToFalse();
+						var reason = string.Empty;
+						if (_restHandler.WrongUsernamePassword)
+						{
+							reason = " - Wrong username and/or password";
+						}
+						SetConnectedToFalse(reason);
 					}
-					var runningTask = Task.Run((Action)RunApplication);
 				}
 			}
 			catch (Exception ex)
 			{
 				//bShutDown = true;
 				_log.Error($"Error on InitIO: {ex.Message}");
-				Shutdown = true;
+				//Shutdown = true;
 				return;
 				//return "Error on InitIO: " + ex.Message;
 			}
-			SetTimer();
 		}
 
-		private void SetConnectedToFalse()
+		private void SetConnectedToFalse(string reason=null)
 		{
+			var notConnectedString = "Not connected";
+			if (!string.IsNullOrEmpty(reason))
+			{
+				notConnectedString += $"- {reason}";
+			}
 			foreach (KeyValuePair<string, JObject> pair in JsonCommand)
 			{
 				Device connectionDevice = ClimateDevices[pair.Key.ToString()][Constants.Connection];
-				connectionDevice.SetValue((double)0).SetText("Not connected");
-				//.SetText;
+				connectionDevice.SetValue((double)0).SetText(notConnectedString);
 			}
 		}
 
@@ -193,6 +214,7 @@ namespace HSPI_MelcloudClimate
 		{
 			// do your shutdown stuff here
 			_log.Info($"Shutting down plugin {Utility.PluginName}");
+			_log.Dispose();
 			Shutdown = true;
 			// setting this flag will cause the plugin to disconnect immediately from HomeSeer
 		}
@@ -209,55 +231,66 @@ namespace HSPI_MelcloudClimate
 			}
 
 			var result = _restHandler.Login(_iniSettings.UserNameMelCloud, _iniSettings.PasswordMelCloud);
-
-			if (result.Success)
+			if (_restHandler.IsConnected && !_restHandler.WrongUsernamePassword)
 			{
-				dynamic data = JsonConvert.DeserializeObject(result.ResponseContent); //Convert data
-
-				if (data.ContainsKey("ErrorId") && data.ErrorId == null)
-				{
-					_log.Debug("Seems like a login was successful");
-					ContextKey = data.LoginData.ContextKey;
-					_log.Info("Successfully logged in to Melcloud");
-				}
-				else
-				{
-					_log.Debug("Username or password invalid");
-
-				}
+				_log.Debug("Logged inn ok");
+				_deviceHandler.SetConnectedDevicesToConnected();
 			}
 			else
 			{
-				_log.Info($"Could not login to Melcloud : {result.Error}");
+				_log.Info($"Could not log in to Melcloud Id: {_restHandler.ErrorId} - msg: {_restHandler.ErrorMessage}");
+				var reason = string.Empty;
+				if (_restHandler.WrongUsernamePassword)
+				{
+					reason = " - Wrong username and/or password";
+				}
+				_deviceHandler.SetConnectedDevicesToNotConnected(reason);
 			}
 
 		}
 
-		private void RunApplication()
-		{
-			_log.Debug("Running Application Task");
+		//private void RunApplication()
+		//{
+		//	_log.Debug("Running Application Task");
 
-			try
-			{
-				GetDevices();
-				RefreshDevices();
-
-				_log.Debug("Starting a loop timer");
-
-			}
-			catch (Exception ex)
-			{
-				_log.Error(ex.Message);
-				//bShutDown = true;
-				Shutdown = true;
-			}
-		}
+		//	try
+		//	{
+		//		GetDevices();
+		//		RefreshDevices();
+//		//_log.Debug("Starting a loop timer");
+		//	}
+		//	catch (Exception ex)
+		//	{
+		//		_log.Error(ex.Message);
+		//		//bShutDown = true;
+		//		//Shutdown = true;
+		//	}
+		//}
 
 		private void OnTimedEvent(Object source, System.Timers.ElapsedEventArgs e)
 		{
 			_log.Debug($"Raised: {e.SignalTime}");
 
-			if (_restHandler.NoContext) return;
+			if (_restHandler.NoContext)
+			{
+				_log.Info("Could not run timed event connecting to MelClould. No context found.");
+				_deviceHandler.SetConnectedDevicesToNotConnected();
+				_notConnectedAttempts++;
+				if (_notConnectedAttempts % 2 == 0)
+				{
+					TryReconnect();
+					_notConnectedAttempts=0;
+				}
+				return;
+			}
+
+			_connectedTimes++;
+			if (_connectedTimes > 120)
+			{
+				//Do a new login/fetch devices after 120 connected.
+				TryReconnect();
+				_connectedTimes = 0;
+			}
 
 			//Periodical run system check
 			//First check if its local changes to save to cloud
@@ -269,6 +302,11 @@ namespace HSPI_MelcloudClimate
 					RefreshDevices();
 
 			}
+		}
+
+		private void TryReconnect()
+		{
+			StartLoginAndDataFetching();
 		}
 
 		private void CreateMelcloudDevice(dynamic device)
@@ -438,12 +476,8 @@ namespace HSPI_MelcloudClimate
 			{
 				if (_restHandler.NoContext)
 				{
-					foreach (KeyValuePair<string, JObject> pair in JsonCommand)
-					{
-						Device connectionDevice = ClimateDevices[pair.Key.ToString()][Constants.Connection];
-						connectionDevice.SetValue((double)0).SetText("Not connected");
-						//.SetText;
-					}
+					SetConnectionDeviceToNotConnected();
+					
 					return false;
 				}
 				//Temporary copy the json
@@ -451,10 +485,7 @@ namespace HSPI_MelcloudClimate
 				//Refresh all devices 
 				foreach (KeyValuePair<string, JObject> pair in JsonCommand)
 				{
-
-					Device connectionDevice = ClimateDevices[pair.Key.ToString()][Constants.Connection];
-					connectionDevice.SetValue((double)1).SetText($"Connected - {DateTime.Now.ToString("HH:mm:ss")}");
-
+					
 					if (JsonCommand[pair.Key.ToString()].HasPendingCommand == true)
 					{
 						_log.Debug("Waiting for changes, abort this update");
@@ -467,22 +498,36 @@ namespace HSPI_MelcloudClimate
 
 					if (!result.Success)
 					{
+						_unsuccessfullAttempts++;
+						if (_unsuccessfullAttempts > 3)
+						{
+							_restHandler.RemoveContext();
+							_unsuccessfullAttempts = 0;
+						}
 						continue;
 					}
 
+					Device connectionDevice = ClimateDevices[pair.Key.ToString()][Constants.Connection];
+					connectionDevice.SetValue((double)1).SetText($"Connected");// - {DateTime.Now.ToString("HH:mm:ss")}");
+
+
+					_unsuccessfullAttempts = 0;
 					dynamic deviceResponse = JObject.Parse(result.ResponseContent);
 
 					//Update fields
 
+					if (deviceResponse.ContainsKey("NextCommunication"))
+					{
+						_nextCommunication = deviceResponse.NextCommunication;
+					}
 
+			
 					//Check for changes
 					if (JsonCommand[pair.Key.ToString()].ContainsKey("EffectiveFlags") &&
 						JsonCommand[pair.Key.ToString()].EffectiveFlags != deviceResponse.EffectiveFlags)
 					{
 						JsonCommand[pair.Key.ToString()].EffectiveFlags = deviceResponse.EffectiveFlags;
 					}
-
-
 
 					if (JsonCommand[pair.Key.ToString()].ContainsKey("RoomTemperature") &&
 						JsonCommand[pair.Key.ToString()].RoomTemperature != deviceResponse.RoomTemperature)
@@ -491,7 +536,6 @@ namespace HSPI_MelcloudClimate
 						ClimateDevices[pair.Key.ToString()]["CurrentTemperatureDevice"]
 							.SetValue((double)deviceResponse.RoomTemperature);
 					}
-
 
 					if (JsonCommand[pair.Key.ToString()].ContainsKey("SetTemperature") &&
 						JsonCommand[pair.Key.ToString()].SetTemperature != deviceResponse.SetTemperature)
@@ -506,7 +550,6 @@ namespace HSPI_MelcloudClimate
 						ClimateDevices[pair.Key.ToString()]["SetpointTemperatureDevice"]
 							.SetValue((double)deviceResponse.SetTemperature);
 					}
-
 
 					if (JsonCommand[pair.Key.ToString()].ContainsKey("SetFanSpeed") &&
 						JsonCommand[pair.Key.ToString()].SetFanSpeed != deviceResponse.v)
@@ -529,7 +572,6 @@ namespace HSPI_MelcloudClimate
 						ClimateDevices[pair.Key.ToString()]["OperationalModeDevice"]
 							.SetValue((double)deviceResponse.OperationMode);
 					}
-
 
 					if (JsonCommand[pair.Key.ToString()].ContainsKey("VaneHorizontal") &&
 						JsonCommand[pair.Key.ToString()].VaneHorizontal != deviceResponse.VaneHorizontal)
@@ -597,7 +639,6 @@ namespace HSPI_MelcloudClimate
 						}
 					}
 
-
 					if (JsonCommand[pair.Key.ToString()].ContainsKey(Constants.HasPendingCommand) &&
 						JsonCommand[pair.Key.ToString()].HasPendingCommand != deviceResponse.HasPendingCommand)
 						JsonCommand[pair.Key.ToString()].HasPendingCommand = false;
@@ -606,6 +647,18 @@ namespace HSPI_MelcloudClimate
 
 			return true;
 
+		}
+
+		private void SetConnectionDeviceToNotConnected()
+		{
+			foreach (KeyValuePair<string, JObject> pair in JsonCommand)
+			{
+				Device connectionDevice = ClimateDevices[pair.Key.ToString()][Constants.Connection];
+				connectionDevice.SetValue((double)0).SetText("Not connected");
+				//.SetText;
+			}
+
+			_deviceHandler.SetConnectedDevicesToNotConnected();
 		}
 
 		private bool SaveToCloud(int deviceId)
@@ -752,6 +805,24 @@ namespace HSPI_MelcloudClimate
 
 		}
 
+		public void RestartCheckTriggerTimer()
+		{
+			////Get now time
+			var timeNow = SystemTime.Now().TimeOfDay;
+
+			////Round time to the nearest whole trigger 
+			//var nextWhole = TimeSpan.FromMilliseconds(
+			//	Math.Ceiling((timeNow.TotalMilliseconds) / (_iniSettings.CheckTriggerTimerInterval * 1000)) *
+			//	(_iniSettings.CheckTriggerTimerInterval * 1000));
+
+			////Find the difference in milliseconds
+			//var diff = (int)nextWhole.Subtract(timeNow).TotalMilliseconds;
+			//Console.WriteLine("RestartTimer, timeNow: " + timeNow.ToString());
+			//Console.WriteLine("RestartTimer, nextWhole: " + nextWhole.ToString());
+			//Console.WriteLine("RestartTimer, diff: " + diff);
+
+			//_checkTriggerTimer.Change(diff, _iniSettings.CheckTriggerTimerInterval * 1000);
+		}
 
 		////// NOT USED (yet) ///////////////
 

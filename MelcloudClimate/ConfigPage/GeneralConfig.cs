@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Web;
 using HomeSeerAPI;
 using HSPI_MelcloudClimate.Common;
 using HSPI_MelcloudClimate.Libraries.Logs;
@@ -110,9 +111,9 @@ namespace HSPI_MelcloudClimate.ConfigPage
 			//returnString.Append("  <tr class='tablerowodd'><td>Time between check of Melcloud (minutes:seconds):</td><td>" +
 			//					SetMelCloudTimeCheck() + "</td></tr>");
 
-			////Set log level
-			//returnString.Append("  <tr class='tablerowodd'><td>Log level:</td><td>" + SetLogLevelUserInterface() +
-			//					"</td></tr>");
+			//Set log level
+			returnString.Append("  <tr class='tableroweven'><td>Log level:</td><td>" + SetLogLevelUserInterface() +
+								"</td></tr>");
 
 
 			returnString.Append("</td></tr>");
@@ -243,13 +244,13 @@ namespace HSPI_MelcloudClimate.ConfigPage
 
 		private void HandlePasswordChange(Dictionary<string, string> dicQueryString)
 		{
-			var password = dicQueryString[PasswordKey];
+			var password = HttpUtility.UrlDecode(dicQueryString[PasswordKey]);
 			_iniSettings.PasswordMelCloud = password;
 		}
 
 		private void HandleUserNameChange(Dictionary<string, string> dicQueryString)
 		{
-			var userName = dicQueryString[UserNameKey];
+			var userName = HttpUtility.UrlDecode(dicQueryString[UserNameKey]);
 			_iniSettings.UserNameMelCloud = userName;
 		}
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using HomeSeerAPI;
 using HSPI_MelcloudClimate.Common;
 using HSPI_MelcloudClimate.Libraries.Logs;
@@ -23,6 +24,34 @@ namespace HSPI_MelcloudClimate.ConfigPage
 			_iniSettings = iniSettings;
 			_log = log;
 		}
+
+		private IConfigPage FindSelectedPage(string page)
+		{
+			IConfigPage toBeReturned = _configPages.FirstOrDefault(x => x.PageName == page);
+			if (toBeReturned == null) Console.WriteLine($"Got a pagename that does not exist '{page}'");
+
+			return toBeReturned;
+		}
+
+		public  string GetPagePlugin(string page, string user, int userRights, string queryString)
+		{
+			//Handle callbacks to plugin pages (normally config pages, but also any other page that this plugin controls
+			Console.WriteLine($"got call for page {page} from user {user} with userrights {userRights} and querystring {queryString}");
+			var webPage = FindSelectedPage(page);
+
+			return webPage.GetPagePlugin(page, user, userRights, queryString);
+		}
+
+		public  string PostBackProc(string page, string data, string user, int userRights)
+		{
+			//Console.WriteLine($"postback firing {DateTime.Now.ToString("HH:mm:ss")}");
+			var selectedPage = FindSelectedPage(page);
+			if (selectedPage != null)
+				return selectedPage.PostBackProc(page, data, user, userRights);
+			return "somehting is missing";
+		}
+
+
 		private void RegisterPlugin()
 		{
 			var wpd = new WebPageDesc
@@ -70,6 +99,12 @@ namespace HSPI_MelcloudClimate.ConfigPage
 
 			_callbackApi.RegisterLink(webPageDescription);
 			return (IConfigPage)pageToRegister;
+		}
+
+		public void Register()
+		{
+			RegisterPlugin();
+			CreateConfigPages();
 		}
 	}
 }
