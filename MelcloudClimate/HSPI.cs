@@ -419,8 +419,12 @@ namespace HSPI_MelcloudClimate
 		   .AddPED("DeviceIdKey", deviceId)
 		   .AddPED("Type", Constants.FanSpeed)
 		   .CheckAndCreate((double)device.Device.FanSpeed)
-				  .AddDropdown(0, (int)device.Device.NumberOfFanSpeeds, null, $"images/HomeSeer/contemporary/fan-on.png");
-
+				  //.AddDropdown(0, (int)device.Device.NumberOfFanSpeeds, null, $"images/HomeSeer/contemporary/fan-on.png");
+				.AddButton(0, "Auto", $"images/MelcloudClimate/fan-auto.png")
+				.AddButton(1, "Speed 1", $"images/MelcloudClimate/fan1.png")
+				.AddButton(2, "Speed 2", $"images/MelcloudClimate/fan2.png")
+				.AddButton(3, "Speed 3", $"images/MelcloudClimate/fan3.png")
+				.AddButton(4, "Speed 4", $"images/MelcloudClimate/fan4.png");
 			ClimateDevices[deviceId].Add(Constants.FanSpeed, fanSpeedDevice);
 
 
