@@ -65,14 +65,23 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
 		}
 
 
-		public Device AddButton(double value, string status, string graphicsPath = null)
+		public Device AddButton(double value, string status, string graphicsPath = null, int renderLocationRow = 0, int renderLocationColumn = 0)
 		{
+			var renderLocation = new Enums.CAPIControlLocation() { Column = 0, Row = 0, ColumnSpan = 0 };
+			if (renderLocationRow > 0)
+			{
+				renderLocation.Row = renderLocationRow;
+				renderLocation.Column = renderLocationColumn;
+			}
+
 			var vsPair = new VSVGPairs.VSPair(ePairStatusControl.Both)
 			{
 				PairType = VSVGPairs.VSVGPairType.SingleValue,
 				Value = value,
 				Status = status,
-				Render = Enums.CAPIControlType.Button
+				Render_Location = renderLocation,
+				Render = Enums.CAPIControlType.Button,
+				IncludeValues = true
 			};
 
 			_hs.DeviceVSP_AddPair(Id, vsPair);
@@ -156,7 +165,7 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
 
 		public Device SetText(string text)
 		{
-			_hs.SetDeviceString(Id,text,false);
+			_hs.SetDeviceString(Id, text, false);
 			return this;
 		}
 
@@ -203,5 +212,23 @@ namespace HSPI_MelcloudClimate.Libraries.Devices
 			return this;
 		}
 
+		public Device AddFanSpeedButtons(int numberOfFanSpeeds)
+		{
+			//Assume first speed is always 0 and Auto
+
+			this.AddButton(0, "Auto", $"images/MelcloudClimate/fan-auto.png",1,1);
+			for (int i = 1; i <= numberOfFanSpeeds; i++)
+			{
+				if (i < 6)
+				{
+					this.AddButton(i, $"Speed {i}", $"images/MelcloudClimate/fan{i}.png",2,i);
+				}
+				else
+				{
+					this.AddButton(i, $"Speed {i}", $"images/MelcloudClimate/fan-state-high.png",2, i);
+				}
+			}
+			return this;
+		}
 	}
 }

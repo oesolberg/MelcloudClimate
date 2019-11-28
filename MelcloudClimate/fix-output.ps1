@@ -43,7 +43,7 @@ gci $source -File | where { $_.Name -notmatch ".*$keep.*" } | % {
 #1. Check if the folder exists
 #2. Check if the folder contains files
 #3. Copy files to destination folder
-$folderCollection=@("HTML\Help\","Html\images\","Html\includes\","scripts\includes\","data\");
+$folderCollection=@("html\help\","html\images\","html\includes\","scripts\includes\","data\");
 ForEach($folder in $folderCollection)
 {
     #Sett correct foldername

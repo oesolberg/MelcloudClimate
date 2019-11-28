@@ -1,0 +1,5 @@
+domLevelVaneH = {"0":1,"10":2,"20":3,"30":4,"40":5,"50":12,"60":0}
+domNameVaneH = "1|2|3|4|5|Swing|Auto"
+ 
+domLevelVaneV = {"0":1,"10":2,"20":3,"30":4,"40":5,"50":7,"60":0}
+domNameVaneV = "1|2|3|4|5|Swing|Auto"

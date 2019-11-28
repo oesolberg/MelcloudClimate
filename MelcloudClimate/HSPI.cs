@@ -22,7 +22,7 @@ namespace HSPI_MelcloudClimate
 	// ReSharper disable once InconsistentNaming
 	public class HSPI : HspiBase
 	{
-		private dynamic ClimateDevices = new Dictionary<string, Dictionary<string, Device>>();
+		private Dictionary<string, Dictionary<string, Device>> _climateDevices = new Dictionary<string, Dictionary<string, Device>>();
 		private dynamic JsonCommand = new Dictionary<string, JObject>();
 		private static System.Timers.Timer _timer;
 		private object _pedData = 0;
@@ -91,6 +91,14 @@ namespace HSPI_MelcloudClimate
 					SetOperationMode(Convert.ToInt32(_pedData), Convert.ToInt32(CC.ControlValue));
 				else if (pedType.ToString() == Constants.FanSpeed)
 					SetFanSpeed(Convert.ToInt32(_pedData), Convert.ToInt32(CC.ControlValue));
+				else if (pedType.ToString() == Constants.VaneVertical)
+				{
+					SetVaneVertical(Convert.ToInt32(_pedData), Convert.ToInt32(CC.ControlValue));
+				}
+				else if (pedType.ToString() == Constants.VaneVertical)
+				{
+					SetVaneHorizontal(Convert.ToInt32(_pedData), Convert.ToInt32(CC.ControlValue));
+				}
 			}
 		}
 
@@ -104,10 +112,10 @@ namespace HSPI_MelcloudClimate
 			_log = new Log(HS, _iniSettings);
 
 			_log.Info("Starting plugin");
-			_config = new ConfigHandler( HS, Callback, _iniSettings, _log);
+			_config = new ConfigHandler(HS, Callback, _iniSettings, _log);
 			_config.Register();
 
-			_deviceHandler=new DeviceHandler(HS,_log);
+			_deviceHandler = new DeviceHandler(HS, _log);
 
 			_settings = new Setting(HS);
 			_settings.DoIniFileTemplateIfFileMissing();
@@ -124,7 +132,7 @@ namespace HSPI_MelcloudClimate
 		private void IniSettingsChangedForUserNamePassword(object sender, EventArgs eventArgs)
 		{
 			//Do something to login with new username and password
-			Login();
+			StartLoginAndDataFetching();
 		}
 
 		//private void IniSettingsChangedForCheckInterval(object sender, EventArgs eventArgs)
@@ -144,7 +152,7 @@ namespace HSPI_MelcloudClimate
 		{
 			var thread = new Thread(() => StartLoginAndDataFetching());
 			thread.Start();
-			
+
 		}
 
 		private void StartLoginAndDataFetching()
@@ -159,7 +167,7 @@ namespace HSPI_MelcloudClimate
 						//RunApplication();
 						GetDevices();
 						RefreshDevices();
-						if(_timer==null)
+						if (_timer == null)
 							SetTimer();
 					}
 
@@ -184,7 +192,7 @@ namespace HSPI_MelcloudClimate
 			}
 		}
 
-		private void SetConnectedToFalse(string reason=null)
+		private void SetConnectedToFalse(string reason = null)
 		{
 			var notConnectedString = "Not connected";
 			if (!string.IsNullOrEmpty(reason))
@@ -193,7 +201,7 @@ namespace HSPI_MelcloudClimate
 			}
 			foreach (KeyValuePair<string, JObject> pair in JsonCommand)
 			{
-				Device connectionDevice = ClimateDevices[pair.Key.ToString()][Constants.Connection];
+				Device connectionDevice = _climateDevices[pair.Key.ToString()][Constants.Connection];
 				connectionDevice.SetValue((double)0).SetText(notConnectedString);
 			}
 		}
@@ -257,7 +265,7 @@ namespace HSPI_MelcloudClimate
 		//	{
 		//		GetDevices();
 		//		RefreshDevices();
-//		//_log.Debug("Starting a loop timer");
+		//		//_log.Debug("Starting a loop timer");
 		//	}
 		//	catch (Exception ex)
 		//	{
@@ -279,7 +287,7 @@ namespace HSPI_MelcloudClimate
 				if (_notConnectedAttempts % 2 == 0)
 				{
 					TryReconnect();
-					_notConnectedAttempts=0;
+					_notConnectedAttempts = 0;
 				}
 				return;
 			}
@@ -313,7 +321,11 @@ namespace HSPI_MelcloudClimate
 		{
 			string deviceId = device.DeviceID.ToString();
 
-			ClimateDevices.Add(deviceId, new Dictionary<String, Device>());
+			//Exit if the device already exists 
+			if (_climateDevices.ContainsKey(deviceId))
+				return;
+
+			_climateDevices.Add(deviceId, new Dictionary<string, Device>());
 
 			JsonCommand.Add(deviceId, new JObject()); //Create a new object
 
@@ -339,7 +351,7 @@ namespace HSPI_MelcloudClimate
 			.SetText("Connected")
 			.SetValue(1);
 
-			ClimateDevices[deviceId].Add(Constants.Connection, ConnectedRootDevice);
+			_climateDevices[deviceId].Add(Constants.Connection, ConnectedRootDevice);
 
 			Device powerDevice = new Device(HS, ConnectedRootDevice)
 			{
@@ -354,7 +366,7 @@ namespace HSPI_MelcloudClimate
 			.AddButton(1, "On", $"images/HomeSeer/contemporary/on.gif")
 			.AddButton(0, "Off", $"images/HomeSeer/contemporary/off.gif");
 
-			ClimateDevices[deviceId].Add(Constants.PowerDevice, powerDevice);
+			_climateDevices[deviceId].Add(Constants.PowerDevice, powerDevice);
 
 			//Set the device to the modus picked up
 
@@ -371,7 +383,7 @@ namespace HSPI_MelcloudClimate
 			.CheckAndCreate((double)device.Device.RoomTemperature)
 			.AddStatusControlRangeField(0, 50, " " + (char)176 + "C", true, $"images/HomeSeer/contemporary/Thermometer-110.png");
 
-			ClimateDevices[deviceId].Add("CurrentTemperatureDevice", currentTemperatureDevice);
+			_climateDevices[deviceId].Add("CurrentTemperatureDevice", currentTemperatureDevice);
 
 
 
@@ -388,7 +400,7 @@ namespace HSPI_MelcloudClimate
 
 			//Get current setpoint
 			JsonCommand[deviceId].SetTemperature = device.Device.SetTemperature;
-			ClimateDevices[deviceId].Add("SetpointTemperatureDevice", setpointTemperatureDevice);
+			_climateDevices[deviceId].Add("SetpointTemperatureDevice", setpointTemperatureDevice);
 
 			Device operationalModeDevice = new Device(HS, ConnectedRootDevice)
 			{
@@ -408,7 +420,7 @@ namespace HSPI_MelcloudClimate
 			//Get current setpoint
 			JsonCommand[deviceId].OperationMode = device.Device.OperationMode;
 
-			ClimateDevices[deviceId].Add("OperationalModeDevice", operationalModeDevice);
+			_climateDevices[deviceId].Add("OperationalModeDevice", operationalModeDevice);
 
 			Device fanSpeedDevice = new Device(HS, ConnectedRootDevice)
 			{
@@ -416,17 +428,59 @@ namespace HSPI_MelcloudClimate
 				Unique = deviceId
 
 			}
-		   .AddPED("DeviceIdKey", deviceId)
-		   .AddPED("Type", Constants.FanSpeed)
-		   .CheckAndCreate((double)device.Device.FanSpeed)
-				  //.AddDropdown(0, (int)device.Device.NumberOfFanSpeeds, null, $"images/HomeSeer/contemporary/fan-on.png");
-				.AddButton(0, "Auto", $"images/MelcloudClimate/fan-auto.png")
-				.AddButton(1, "Speed 1", $"images/MelcloudClimate/fan1.png")
-				.AddButton(2, "Speed 2", $"images/MelcloudClimate/fan2.png")
-				.AddButton(3, "Speed 3", $"images/MelcloudClimate/fan3.png")
-				.AddButton(4, "Speed 4", $"images/MelcloudClimate/fan4.png");
-			ClimateDevices[deviceId].Add(Constants.FanSpeed, fanSpeedDevice);
+				.AddPED("DeviceIdKey", deviceId)
+				.AddPED("Type", Constants.FanSpeed)
+				.CheckAndCreate((double)device.Device.FanSpeed)
+				.AddFanSpeedButtons((int)device.Device.NumberOfFanSpeeds);
+			_climateDevices[deviceId].Add(Constants.FanSpeed, fanSpeedDevice);
 
+			//Add vanes?
+			if ((bool)device.Device.ModelSupportsVaneHorizontal)
+			{
+				Device vaneHorizontalDevice = new Device(HS, ConnectedRootDevice)
+				{
+					Name = "Vane Horizontal",
+					Unique = deviceId
+
+				}
+					.AddPED("DeviceIdKey", deviceId)
+					.AddPED("Type", Constants.VaneHorizontal)
+					.CheckAndCreate((double)device.Device.VaneHorizontalDirection)
+					//1 | 2 | 3 | 4 | 5 | Swing | Auto - {1|2|3|4|5|12|0}
+					.AddButton(12, "Swing", $"images/HomeSeer/contemporary/auto-mode.png", 1, 1)
+					.AddButton(0, "Auto", $"images/HomeSeer/contemporary/auto-mode.png", 1, 2)
+					.AddButton(1, "Pos 1", $"images/HomeSeer/contemporary/auto-mode.png", 2, 1)
+					.AddButton(2, "Pos 2", $"images/HomeSeer/contemporary/auto-mode.png", 2, 2)
+					.AddButton(3, "Pos 3", $"images/HomeSeer/contemporary/auto-mode.png", 2, 3)
+					.AddButton(4, "Pos 4", $"images/HomeSeer/contemporary/auto-mode.png", 2, 4)
+					.AddButton(5, "Pos 5", $"images/HomeSeer/contemporary/auto-mode.png", 2, 5);
+
+				_climateDevices[deviceId].Add(Constants.VaneHorizontal, vaneHorizontalDevice);
+				JsonCommand[deviceId].VaneHorizontal = device.Device.VaneHorizontal;
+			}
+
+			if ((bool)device.Device.ModelSupportsVaneVertical)
+			{
+				Device vaneVerticalDevice = new Device(HS, ConnectedRootDevice)
+				{
+					Name = "Vane Vertical",
+					Unique = deviceId
+
+				}
+					.AddPED("DeviceIdKey", deviceId)
+					.AddPED("Type", Constants.VaneVertical)
+					.CheckAndCreate((double)device.Device.VaneVerticalDirection)
+					//1|2|3|4|5|Swing|Auto - {1|2|3|4|5|7|0}
+					.AddButton(7, "Swing", $"images/HomeSeer/contemporary/auto-mode.png",1,1)
+					.AddButton(0, "Auto", $"images/HomeSeer/contemporary/auto-mode.png", 1, 2)
+					.AddButton(1, "Pos 1", $"images/HomeSeer/contemporary/auto-mode.png", 2, 1)
+					.AddButton(2, "Pos 2", $"images/HomeSeer/contemporary/auto-mode.png",2,2)
+					.AddButton(3, "Pos 3", $"images/HomeSeer/contemporary/auto-mode.png",2,3)
+					.AddButton(4, "Pos 4", $"images/HomeSeer/contemporary/auto-mode.png",2,4)
+					.AddButton(5, "Pos 5", $"images/HomeSeer/contemporary/auto-mode.png", 2, 5);
+				_climateDevices[deviceId].Add(Constants.VaneVertical, vaneVerticalDevice);
+				JsonCommand[deviceId].VaneVertical = device.Device.VaneVertical;
+			}
 
 		}
 
@@ -464,6 +518,21 @@ namespace HSPI_MelcloudClimate
 			return true;
 		}
 
+		private bool SetVaneVertical(int deviceId, int target)
+		{
+			JsonCommand[deviceId.ToString()].VaneVertical = target;
+			_log.Debug("Setting vane vertical to : " + target);
+			JsonCommand[deviceId.ToString()].HasPendingCommand = true;
+			return true;
+		}
+
+		private bool SetVaneHorizontal(int deviceId, int target)
+		{
+			JsonCommand[deviceId.ToString()].VaneHorizontal = target;
+			_log.Debug("Setting vane horizontal to: " + target);
+			JsonCommand[deviceId.ToString()].HasPendingCommand = true;
+			return true;
+		}
 
 		private bool PowerOff(int deviceId)
 		{
@@ -481,7 +550,7 @@ namespace HSPI_MelcloudClimate
 				if (_restHandler.NoContext)
 				{
 					SetConnectionDeviceToNotConnected();
-					
+
 					return false;
 				}
 				//Temporary copy the json
@@ -489,7 +558,7 @@ namespace HSPI_MelcloudClimate
 				//Refresh all devices 
 				foreach (KeyValuePair<string, JObject> pair in JsonCommand)
 				{
-					
+
 					if (JsonCommand[pair.Key.ToString()].HasPendingCommand == true)
 					{
 						_log.Debug("Waiting for changes, abort this update");
@@ -511,7 +580,7 @@ namespace HSPI_MelcloudClimate
 						continue;
 					}
 
-					Device connectionDevice = ClimateDevices[pair.Key.ToString()][Constants.Connection];
+					Device connectionDevice = _climateDevices[pair.Key.ToString()][Constants.Connection];
 					connectionDevice.SetValue((double)1).SetText($"Connected");// - {DateTime.Now.ToString("HH:mm:ss")}");
 
 
@@ -525,7 +594,7 @@ namespace HSPI_MelcloudClimate
 						_nextCommunication = deviceResponse.NextCommunication;
 					}
 
-			
+
 					//Check for changes
 					if (JsonCommand[pair.Key.ToString()].ContainsKey("EffectiveFlags") &&
 						JsonCommand[pair.Key.ToString()].EffectiveFlags != deviceResponse.EffectiveFlags)
@@ -533,25 +602,33 @@ namespace HSPI_MelcloudClimate
 						JsonCommand[pair.Key.ToString()].EffectiveFlags = deviceResponse.EffectiveFlags;
 					}
 
-					if (JsonCommand[pair.Key.ToString()].ContainsKey("RoomTemperature") &&
-						JsonCommand[pair.Key.ToString()].RoomTemperature != deviceResponse.RoomTemperature)
+					//Old code not working?
+					//if (JsonCommand[pair.Key.ToString()].ContainsKey("RoomTemperature") &&
+					//	JsonCommand[pair.Key.ToString()].RoomTemperature != deviceResponse.RoomTemperature)
+					//{
+					//	JsonCommand[pair.Key.ToString()].RoomTemperature = deviceResponse.RoomTemperature;
+					//	_climateDevices[pair.Key.ToString()]["CurrentTemperatureDevice"]
+					//		.SetValue((double)deviceResponse.RoomTemperature);
+					//}
+					//New code for getting RoomTemp
+					if (deviceResponse.ContainsKey("RoomTemperature") && _climateDevices[pair.Key.ToString()].ContainsKey("CurrentTemperatureDevice"))
 					{
-						JsonCommand[pair.Key.ToString()].RoomTemperature = deviceResponse.RoomTemperature;
-						ClimateDevices[pair.Key.ToString()]["CurrentTemperatureDevice"]
-							.SetValue((double)deviceResponse.RoomTemperature);
+						_climateDevices[pair.Key.ToString()]["CurrentTemperatureDevice"]
+							.SetValue((double)deviceResponse["RoomTemperature"]);
 					}
 
 					if (JsonCommand[pair.Key.ToString()].ContainsKey("SetTemperature") &&
 						JsonCommand[pair.Key.ToString()].SetTemperature != deviceResponse.SetTemperature)
 					{
 						JsonCommand[pair.Key.ToString()].SetTemperature = deviceResponse.SetTemperature;
-						ClimateDevices[pair.Key.ToString()]["SetpointTemperatureDevice"]
+
+						_climateDevices[pair.Key.ToString()]["SetpointTemperatureDevice"]
 							.SetValue((double)deviceResponse.SetTemperature);
 					}
 					else if (JsonCommand[pair.Key.ToString()].ContainsKey("SetTemperature") == false)
 					{
 						JsonCommand[pair.Key.ToString()].SetTemperature = deviceResponse.SetTemperature;
-						ClimateDevices[pair.Key.ToString()]["SetpointTemperatureDevice"]
+						_climateDevices[pair.Key.ToString()]["SetpointTemperatureDevice"]
 							.SetValue((double)deviceResponse.SetTemperature);
 					}
 
@@ -559,13 +636,13 @@ namespace HSPI_MelcloudClimate
 						JsonCommand[pair.Key.ToString()].SetFanSpeed != deviceResponse.v)
 					{
 						JsonCommand[pair.Key.ToString()].SetFanSpeed = deviceResponse.SetFanSpeed;
-						ClimateDevices[pair.Key.ToString()][Constants.FanSpeed]
+						_climateDevices[pair.Key.ToString()][Constants.FanSpeed]
 							.SetValue((double)deviceResponse.SetFanSpeed);
 					}
 					else if (JsonCommand[pair.Key.ToString()].ContainsKey("SetFanSpeed") == false)
 					{
 						JsonCommand[pair.Key.ToString()].SetFanSpeed = deviceResponse.SetFanSpeed;
-						ClimateDevices[pair.Key.ToString()][Constants.FanSpeed]
+						_climateDevices[pair.Key.ToString()][Constants.FanSpeed]
 							.SetValue((double)deviceResponse.SetFanSpeed);
 					}
 
@@ -573,17 +650,25 @@ namespace HSPI_MelcloudClimate
 						JsonCommand[pair.Key.ToString()].OperationMode != deviceResponse.OperationMode)
 					{
 						JsonCommand[pair.Key.ToString()].OperationMode = deviceResponse.OperationMode;
-						ClimateDevices[pair.Key.ToString()]["OperationalModeDevice"]
+						_climateDevices[pair.Key.ToString()]["OperationalModeDevice"]
 							.SetValue((double)deviceResponse.OperationMode);
 					}
 
 					if (JsonCommand[pair.Key.ToString()].ContainsKey("VaneHorizontal") &&
 						JsonCommand[pair.Key.ToString()].VaneHorizontal != deviceResponse.VaneHorizontal)
+					{
 						JsonCommand[pair.Key.ToString()].VaneHorizontal = deviceResponse.VaneHorizontal;
+						_climateDevices[pair.Key.ToString()][Constants.VaneHorizontal]
+							.SetValue((double)deviceResponse.VaneHorizontal);
+					}
 
 					if (JsonCommand[pair.Key.ToString()].ContainsKey("VaneVertical") &&
 						JsonCommand[pair.Key.ToString()].VaneVertical != deviceResponse.VaneVertical)
+					{
 						JsonCommand[pair.Key.ToString()].VaneVertical = deviceResponse.VaneVertical;
+						_climateDevices[pair.Key.ToString()][Constants.VaneVertical]
+							.SetValue((double)deviceResponse.VaneVertical);
+					}
 
 					if (JsonCommand[pair.Key.ToString()].ContainsKey("NumberOfFanSpeeds") &&
 						JsonCommand[pair.Key.ToString()].NumberOfFanSpeeds != deviceResponse.NumberOfFanSpeeds)
@@ -592,24 +677,30 @@ namespace HSPI_MelcloudClimate
 					if (JsonCommand[pair.Key.ToString()].ContainsKey("DefaultHeatingSetTemperature") &&
 						JsonCommand[pair.Key.ToString()].DefaultHeatingSetTemperature !=
 						deviceResponse.DefaultHeatingSetTemperature)
+					{
 						JsonCommand[pair.Key.ToString()].DefaultHeatingSetTemperature =
-							deviceResponse.DefaultHeatingSetTemperature;
+							  deviceResponse.DefaultHeatingSetTemperature;
+					}
 
 					if (JsonCommand[pair.Key.ToString()].ContainsKey("DefaultCoolingSetTemperature") &&
 						JsonCommand[pair.Key.ToString()].DefaultCoolingSetTemperature !=
 						deviceResponse.DefaultCoolingSetTemperature)
+					{
 						JsonCommand[pair.Key.ToString()].DefaultCoolingSetTemperature =
 							deviceResponse.DefaultCoolingSetTemperature;
+					}
 
 					if (JsonCommand[pair.Key.ToString()].ContainsKey("InStandbyMode") &&
 						JsonCommand[pair.Key.ToString()].InStandbyMode != deviceResponse.InStandbyMode)
+					{
 						JsonCommand[pair.Key.ToString()].InStandbyMode = deviceResponse.InStandbyMode;
+					}
 
 					if (JsonCommand[pair.Key.ToString()].ContainsKey("Power") &&
 						JsonCommand[pair.Key.ToString()].Power != deviceResponse.Power)
 					{
 						JsonCommand[pair.Key.ToString()].Power = deviceResponse.Power;
-						ClimateDevices[pair.Key.ToString()][Constants.PowerDevice].SetValue((double)deviceResponse.Power);
+						_climateDevices[pair.Key.ToString()][Constants.PowerDevice].SetValue((double)deviceResponse.Power);
 					}
 
 					if (JsonCommand[pair.Key.ToString()].ContainsKey("Power") &&
@@ -618,12 +709,12 @@ namespace HSPI_MelcloudClimate
 						if (deviceResponse.Power == true)
 						{
 							JsonCommand[pair.Key.ToString()].Power = true;
-							ClimateDevices[pair.Key.ToString()][Constants.PowerDevice].SetValue((double)1);
+							_climateDevices[pair.Key.ToString()][Constants.PowerDevice].SetValue((double)1);
 						}
 						else
 						{
 							JsonCommand[pair.Key.ToString()].Power = false;
-							ClimateDevices[pair.Key.ToString()][Constants.PowerDevice].SetValue((double)0);
+							_climateDevices[pair.Key.ToString()][Constants.PowerDevice].SetValue((double)0);
 
 						}
 
@@ -633,12 +724,12 @@ namespace HSPI_MelcloudClimate
 						if (deviceResponse.Power == true)
 						{
 							JsonCommand[pair.Key.ToString()].Power = true;
-							ClimateDevices[pair.Key.ToString()][Constants.PowerDevice].SetValue((double)1);
+							_climateDevices[pair.Key.ToString()][Constants.PowerDevice].SetValue((double)1);
 						}
 						else
 						{
 							JsonCommand[pair.Key.ToString()].Power = false;
-							ClimateDevices[pair.Key.ToString()][Constants.PowerDevice].SetValue((double)0);
+							_climateDevices[pair.Key.ToString()][Constants.PowerDevice].SetValue((double)0);
 
 						}
 					}
@@ -657,7 +748,7 @@ namespace HSPI_MelcloudClimate
 		{
 			foreach (KeyValuePair<string, JObject> pair in JsonCommand)
 			{
-				Device connectionDevice = ClimateDevices[pair.Key.ToString()][Constants.Connection];
+				Device connectionDevice = _climateDevices[pair.Key.ToString()][Constants.Connection];
 				connectionDevice.SetValue((double)0).SetText("Not connected");
 				//.SetText;
 			}
