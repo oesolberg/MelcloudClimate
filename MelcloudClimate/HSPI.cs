@@ -99,6 +99,8 @@ namespace HSPI_MelcloudClimate
 				{
 					SetVaneHorizontal(Convert.ToInt32(_pedData), Convert.ToInt32(CC.ControlValue));
 				}
+
+				SaveToCloud(Convert.ToInt32(_pedData));
 			}
 		}
 
@@ -322,16 +324,15 @@ namespace HSPI_MelcloudClimate
 			string deviceId = device.DeviceID.ToString();
 
 			//Exit if the device already exists 
-			if (_climateDevices.ContainsKey(deviceId))
-				return;
+			if (!_climateDevices.ContainsKey(deviceId))
+			{
+				_climateDevices.Add(deviceId, new Dictionary<string, Device>());
 
-			_climateDevices.Add(deviceId, new Dictionary<string, Device>());
-
-			JsonCommand.Add(deviceId, new JObject()); //Create a new object
-
-			JsonCommand[deviceId].DeviceID = deviceId;
-			JsonCommand[deviceId].BuildingId = device.BuildingID;
-			JsonCommand[deviceId].HasPendingCommand = false;
+				JsonCommand.Add(deviceId, new JObject()); //Create a new object
+				JsonCommand[deviceId].DeviceID = deviceId;
+				JsonCommand[deviceId].BuildingId = device.BuildingID;
+				JsonCommand[deviceId].HasPendingCommand = false;
+			}
 
 
 			double powerState = 0;
@@ -351,7 +352,8 @@ namespace HSPI_MelcloudClimate
 			.SetText("Connected")
 			.SetValue(1);
 
-			_climateDevices[deviceId].Add(Constants.Connection, ConnectedRootDevice);
+			if (!_climateDevices[deviceId].ContainsKey(Constants.Connection))
+				_climateDevices[deviceId].Add(Constants.Connection, ConnectedRootDevice);
 
 			Device powerDevice = new Device(HS, ConnectedRootDevice)
 			{
@@ -366,7 +368,9 @@ namespace HSPI_MelcloudClimate
 			.AddButton(1, "On", $"images/HomeSeer/contemporary/on.gif")
 			.AddButton(0, "Off", $"images/HomeSeer/contemporary/off.gif");
 
-			_climateDevices[deviceId].Add(Constants.PowerDevice, powerDevice);
+
+			if (!_climateDevices[deviceId].ContainsKey(Constants.PowerDevice))
+				_climateDevices[deviceId].Add(Constants.PowerDevice, powerDevice);
 
 			//Set the device to the modus picked up
 
@@ -383,7 +387,9 @@ namespace HSPI_MelcloudClimate
 			.CheckAndCreate((double)device.Device.RoomTemperature)
 			.AddStatusControlRangeField(0, 50, " " + (char)176 + "C", true, $"images/HomeSeer/contemporary/Thermometer-110.png");
 
-			_climateDevices[deviceId].Add("CurrentTemperatureDevice", currentTemperatureDevice);
+
+			if (!_climateDevices[deviceId].ContainsKey(Constants.CurrentTemperatureDevice))
+				_climateDevices[deviceId].Add(Constants.CurrentTemperatureDevice, currentTemperatureDevice);
 
 
 
@@ -400,7 +406,9 @@ namespace HSPI_MelcloudClimate
 
 			//Get current setpoint
 			JsonCommand[deviceId].SetTemperature = device.Device.SetTemperature;
-			_climateDevices[deviceId].Add("SetpointTemperatureDevice", setpointTemperatureDevice);
+
+			if (!_climateDevices[deviceId].ContainsKey(Constants.SetpointTemperatureDevice))
+				_climateDevices[deviceId].Add(Constants.SetpointTemperatureDevice, setpointTemperatureDevice);
 
 			Device operationalModeDevice = new Device(HS, ConnectedRootDevice)
 			{
@@ -420,7 +428,8 @@ namespace HSPI_MelcloudClimate
 			//Get current setpoint
 			JsonCommand[deviceId].OperationMode = device.Device.OperationMode;
 
-			_climateDevices[deviceId].Add("OperationalModeDevice", operationalModeDevice);
+			if (!_climateDevices[deviceId].ContainsKey(Constants.OperationalModeDevice))
+				_climateDevices[deviceId].Add(Constants.OperationalModeDevice, operationalModeDevice);
 
 			Device fanSpeedDevice = new Device(HS, ConnectedRootDevice)
 			{
@@ -432,7 +441,9 @@ namespace HSPI_MelcloudClimate
 				.AddPED("Type", Constants.FanSpeed)
 				.CheckAndCreate((double)device.Device.FanSpeed)
 				.AddFanSpeedButtons((int)device.Device.NumberOfFanSpeeds);
-			_climateDevices[deviceId].Add(Constants.FanSpeed, fanSpeedDevice);
+
+			if (!_climateDevices[deviceId].ContainsKey(Constants.FanSpeed))
+				_climateDevices[deviceId].Add(Constants.FanSpeed, fanSpeedDevice);
 
 			//Add vanes?
 			if ((bool)device.Device.ModelSupportsVaneHorizontal)
@@ -447,15 +458,16 @@ namespace HSPI_MelcloudClimate
 					.AddPED("Type", Constants.VaneHorizontal)
 					.CheckAndCreate((double)device.Device.VaneHorizontalDirection)
 					//1 | 2 | 3 | 4 | 5 | Swing | Auto - {1|2|3|4|5|12|0}
-					.AddButton(12, "Swing", $"images/HomeSeer/contemporary/auto-mode.png", 1, 1)
-					.AddButton(0, "Auto", $"images/HomeSeer/contemporary/auto-mode.png", 1, 2)
-					.AddButton(1, "Pos 1", $"images/HomeSeer/contemporary/auto-mode.png", 2, 1)
-					.AddButton(2, "Pos 2", $"images/HomeSeer/contemporary/auto-mode.png", 2, 2)
-					.AddButton(3, "Pos 3", $"images/HomeSeer/contemporary/auto-mode.png", 2, 3)
-					.AddButton(4, "Pos 4", $"images/HomeSeer/contemporary/auto-mode.png", 2, 4)
-					.AddButton(5, "Pos 5", $"images/HomeSeer/contemporary/auto-mode.png", 2, 5);
+					.AddButton(12, "Swing", $"images/MelcloudClimate/HorizontalVaneSwing.png", 1, 1)
+					.AddButton(0, "Auto", $"images/MelcloudClimate/Auto.png", 1, 2)
+					.AddButton(1, "Pos 1", $"images/MelcloudClimate/HorizontalVane_1.png", 2, 1)
+					.AddButton(2, "Pos 2", $"images/MelcloudClimate/HorizontalVane_2.png", 2, 2)
+					.AddButton(3, "Pos 3", $"images/MelcloudClimate/HorizontalVane_3.png", 2, 3)
+					.AddButton(4, "Pos 4", $"images/MelcloudClimate/HorizontalVane_4.png", 2, 4)
+					.AddButton(5, "Pos 5", $"images/MelcloudClimate/HorizontalVane_5.png", 2, 5);
 
-				_climateDevices[deviceId].Add(Constants.VaneHorizontal, vaneHorizontalDevice);
+				if (!_climateDevices[deviceId].ContainsKey(Constants.VaneHorizontal))
+					_climateDevices[deviceId].Add(Constants.VaneHorizontal, vaneHorizontalDevice);
 				JsonCommand[deviceId].VaneHorizontal = device.Device.VaneHorizontal;
 			}
 
@@ -471,14 +483,17 @@ namespace HSPI_MelcloudClimate
 					.AddPED("Type", Constants.VaneVertical)
 					.CheckAndCreate((double)device.Device.VaneVerticalDirection)
 					//1|2|3|4|5|Swing|Auto - {1|2|3|4|5|7|0}
-					.AddButton(7, "Swing", $"images/HomeSeer/contemporary/auto-mode.png",1,1)
-					.AddButton(0, "Auto", $"images/HomeSeer/contemporary/auto-mode.png", 1, 2)
-					.AddButton(1, "Pos 1", $"images/HomeSeer/contemporary/auto-mode.png", 2, 1)
-					.AddButton(2, "Pos 2", $"images/HomeSeer/contemporary/auto-mode.png",2,2)
-					.AddButton(3, "Pos 3", $"images/HomeSeer/contemporary/auto-mode.png",2,3)
-					.AddButton(4, "Pos 4", $"images/HomeSeer/contemporary/auto-mode.png",2,4)
-					.AddButton(5, "Pos 5", $"images/HomeSeer/contemporary/auto-mode.png", 2, 5);
-				_climateDevices[deviceId].Add(Constants.VaneVertical, vaneVerticalDevice);
+					.AddButton(7, "Swing", $"images/MelcloudClimate/VerticalVaneSwing.png", 1, 1)
+					.AddButton(0, "Auto", $"images/MelcloudClimate/Auto.png", 1, 2)
+					.AddButton(1, "Pos 1", $"images/MelcloudClimate/VerticalVane_1.png", 2, 1)
+					.AddButton(2, "Pos 2", $"images/MelcloudClimate/VerticalVane_2.png", 2, 2)
+					.AddButton(3, "Pos 3", $"images/MelcloudClimate/VerticalVane_3.png", 2, 3)
+					.AddButton(4, "Pos 4", $"images/MelcloudClimate/VerticalVane_4.png", 2, 4)
+					.AddButton(5, "Pos 5", $"images/MelcloudClimate/VerticalVane_5.png", 2, 5);
+
+				if (!_climateDevices[deviceId].ContainsKey(Constants.VaneVertical))
+					_climateDevices[deviceId].Add(Constants.VaneVertical, vaneVerticalDevice);
+
 				JsonCommand[deviceId].VaneVertical = device.Device.VaneVertical;
 			}
 

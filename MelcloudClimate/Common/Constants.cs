@@ -10,5 +10,8 @@
 		public static string Connection = "Connection";
 		public static string VaneHorizontal = "VaneHorizontal";
 		public static string VaneVertical = "VaneVertical";
+		public static string OperationalModeDevice = "OperationalModeDevice";
+		public static string SetpointTemperatureDevice = "SetpointTemperatureDevice";
+		public static string CurrentTemperatureDevice = "CurrentTemperatureDevice";
 	}
 }
