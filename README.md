@@ -6,6 +6,8 @@ Stop Homeseer and make a copy of the directory with all subdirectories (normally
 
 When you have buildt the project copy all files in directory **...\MelcloudClimate\MelcloudClimate\bin\Release** or **...\MelcloudClimate\MelcloudClimate\bin\Debug** into your HomeSeer directory
 
+Most up to date info found at 
+https://www.hjemmeautomasjon.no/forums/topic/5558-melcloudclimate-plugin/
 
 If from Release:
 
