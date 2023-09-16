@@ -31,7 +31,6 @@ namespace HSPI_MelcloudClimate.ConfigPage
 
 			//returnString.Append(BuildContent());
 			returnString.Append("<br/>");
-			//returnString.Append("<br/>Big thank you to the RFLink Stuntteam! <a href=\"http://www.rflink.nl\" target=\"_blank\">www.rflink.nl</a>");
 			returnString.Append("<br/>");
 			returnString.Append("<br/>Aleks at <a href=\"https://www.hjemmeautomasjon.no\" target=\"_blank\">www.hjemmeautomasjon.no</a>");
 			returnString.Append("<br/>Moskus at <a href=\"https://www.hjemmeautomasjon.no\" target=\"_blank\">www.hjemmeautomasjon.no</a>");
@@ -39,7 +38,8 @@ namespace HSPI_MelcloudClimate.ConfigPage
 
 			returnString.Append("<br/>Testers: ");
 			returnString.Append("<br/>fjaeran at <a href=\"https://www.hjemmeautomasjon.no\" target=\"_blank\">www.hjemmeautomasjon.no</a>");
-			returnString.Append("<br/>");
+            returnString.Append("<br/>PCI at <a href=\"https://www.hjemmeautomasjon.no\" target=\"_blank\">www.hjemmeautomasjon.no</a>");
+            returnString.Append("<br/>");
 
 			//returnString.Append("<br/>Icons from ");
 			//returnString.Append("<br/>Randolph Novino - Noun Project (Barometric pressure icon)");

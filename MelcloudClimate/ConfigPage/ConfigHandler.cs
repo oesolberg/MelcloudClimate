@@ -48,7 +48,7 @@ namespace HSPI_MelcloudClimate.ConfigPage
 			var selectedPage = FindSelectedPage(page);
 			if (selectedPage != null)
 				return selectedPage.PostBackProc(page, data, user, userRights);
-			return "somehting is missing";
+			return "something is missing";
 		}
 
 

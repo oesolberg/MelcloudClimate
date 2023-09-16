@@ -95,7 +95,7 @@ namespace HSPI_MelcloudClimate
 				{
 					SetVaneVertical(Convert.ToInt32(_pedData), Convert.ToInt32(CC.ControlValue));
 				}
-				else if (pedType.ToString() == Constants.VaneVertical)
+				else if (pedType.ToString() == Constants.VaneHorizontal)
 				{
 					SetVaneHorizontal(Convert.ToInt32(_pedData), Convert.ToInt32(CC.ControlValue));
 				}
@@ -136,20 +136,7 @@ namespace HSPI_MelcloudClimate
 			//Do something to login with new username and password
 			StartLoginAndDataFetching();
 		}
-
-		//private void IniSettingsChangedForCheckInterval(object sender, EventArgs eventArgs)
-		//{
-		//	//Reset timer
-		//	_timer.Close();
-
-		//	//Login with username and password
-		//	Login();
-		//	if (!_restHandler.NoContext)
-		//	{
-		//		SetTimer();
-		//	}
-		//}
-
+		
 		private void StartLoginAndDataFetchingInNewThread()
 		{
 			var thread = new Thread(() => StartLoginAndDataFetching());
