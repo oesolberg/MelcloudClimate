@@ -766,7 +766,16 @@ namespace HSPI_MelcloudClimate
 				_log.Debug("Sending changes to cloud");
 
 				JsonCommand[deviceId.ToString()].HasPendingCommand = true;
-				JsonCommand[deviceId.ToString()].EffectiveFlags = 0x1F;
+                /*
+                   #EffectiveFlags(used to specify what to change):
+                    #Power:                0x01
+                    #OperationMode:        0x02
+                    #Temperature:        0x04
+                    #FanSpeed:            0x08
+                    #VaneVertical:        0x10
+                    #VaneHorizontal:    0x100
+                */
+                JsonCommand[deviceId.ToString()].EffectiveFlags = 0x11F;
 
 				RestHandlerResult result = _restHandler.UpdateDevice(JsonCommand[deviceId.ToString()].ToString());
 				_log.Debug("Tried to save: " + JsonCommand[deviceId.ToString()].ToString());
