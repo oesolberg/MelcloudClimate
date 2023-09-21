@@ -31,4 +31,4 @@ after **Username=** replace **InsertUsername** with your username/email
 
 after **Password=** replace **InsertPassword** with your password
 
-You might have to restart the plugin again (go to HomeSeer->Plugins->Manage and turn of then on again the switch for MelcloudClimate).
+You might have to restart the plugin again (go to HomeSeer->Plugins->Manage and turn off then on again the switch for MelcloudClimate).
