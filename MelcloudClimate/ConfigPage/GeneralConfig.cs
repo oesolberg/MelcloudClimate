@@ -108,8 +108,8 @@ namespace HSPI_MelcloudClimate.ConfigPage
 								SetPassword() + "</td></tr>");
 
 			//time between Melcloud checks
-			//returnString.Append("  <tr class='tablerowodd'><td>Time between check of Melcloud (minutes:seconds):</td><td>" +
-			//					SetMelCloudTimeCheck() + "</td></tr>");
+			returnString.Append("  <tr class='tablerowodd'><td>Time between check of Melcloud (minutes:seconds):</td><td>" +
+								SetMelCloudTimeCheck() + "</td></tr>");
 
 			//Set log level
 			returnString.Append("  <tr class='tableroweven'><td>Log level:</td><td>" + SetLogLevelUserInterface() +

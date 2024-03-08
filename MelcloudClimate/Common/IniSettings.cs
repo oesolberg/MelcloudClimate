@@ -45,7 +45,7 @@ namespace HSPI_MelcloudClimate.Common
 		private string _msAppId;
 		private string _userName;
 		private string _password;
-		private const int DefaultTriggerTimeInterval = 70;
+		private const int DefaultTriggerTimeInterval = 120;
 
 
 		public IniSettings(IHSApplication hs)

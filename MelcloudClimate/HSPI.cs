@@ -38,8 +38,9 @@ namespace HSPI_MelcloudClimate
 		private DateTime _nextCommunication;
 		private int _notConnectedAttempts;
 		private int _connectedTimes;
+        private Thread _thread;
 
-		protected override string GetName()
+        protected override string GetName()
 		{
 			return Utility.PluginName;
 		}
@@ -108,7 +109,7 @@ namespace HSPI_MelcloudClimate
 		{
 			_iniSettings = new IniSettings(HS);
 
-			//_iniSettings.IniSettingsChangedForCheckInterval += IniSettingsChangedForCheckInterval;
+			_iniSettings.IniSettingsChangedForCheckInterval += IniSettingsChangedForCheckInterval;
 			_iniSettings.IniSettingsChangedForUserNamePassword += IniSettingsChangedForUserNamePassword; ;
 
 			_log = new Log(HS, _iniSettings);
@@ -131,7 +132,13 @@ namespace HSPI_MelcloudClimate
 			return "";
 		}
 
-		private void IniSettingsChangedForUserNamePassword(object sender, EventArgs eventArgs)
+        private void IniSettingsChangedForCheckInterval(object sender, EventArgs eventArgs)
+        {
+            //Do something to login with new username and password
+            StartLoginAndDataFetching();
+        }
+        
+        private void IniSettingsChangedForUserNamePassword(object sender, EventArgs eventArgs)
 		{
 			//Do something to login with new username and password
 			StartLoginAndDataFetching();
@@ -139,8 +146,18 @@ namespace HSPI_MelcloudClimate
 		
 		private void StartLoginAndDataFetchingInNewThread()
 		{
-			var thread = new Thread(() => StartLoginAndDataFetching());
-			thread.Start();
+            if (_thread != null && _thread.IsAlive)
+            {
+                _thread.Abort();
+                while (_thread.IsAlive)
+                {
+                    Thread.Sleep(500);
+                    _log.Debug("Sleeping 500 milliseconds while waiting for the old thread to abort");
+                }
+            }
+
+			_thread = new Thread(() => StartLoginAndDataFetching());
+			_thread.Start();
 
 		}
 
@@ -199,11 +216,15 @@ namespace HSPI_MelcloudClimate
 		{
 			//Setting timer 
 			_log.Debug($"Setting timer with {_iniSettings.CheckMelCloudTimerInterval} seconds interval");
-			_timer = new System.Timers.Timer();
+            if (_timer == null)
+            {
+                _timer = new System.Timers.Timer();
+                _timer.Elapsed += OnTimedEvent;
+                _timer.AutoReset = true;
+                _timer.Enabled = true;
+            }
 			_timer.Interval = _iniSettings.CheckMelCloudTimerIntervalInMilliseconds;
-			_timer.Elapsed += OnTimedEvent;
-			_timer.AutoReset = true;
-			_timer.Enabled = true;
+			
 		}
 
 
@@ -266,7 +287,7 @@ namespace HSPI_MelcloudClimate
 
 		private void OnTimedEvent(Object source, System.Timers.ElapsedEventArgs e)
 		{
-			_log.Debug($"Raised: {e.SignalTime}");
+			_log.Debug($"Raised OnTimedEvent: {e.SignalTime}");
 
 			if (_restHandler.NoContext)
 			{
