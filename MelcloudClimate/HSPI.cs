@@ -390,7 +390,7 @@ namespace HSPI_MelcloudClimate
             double roomTemperature = 20;
 
 
-            if ((int)device.Device.DeviceType == 1)
+            if ((int)device.Device.DeviceType == 0)
             {
                 roomTemperature = (double)device.Device.RoomTemperature;
             }
