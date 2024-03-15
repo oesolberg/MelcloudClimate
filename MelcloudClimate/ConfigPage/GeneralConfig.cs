@@ -23,7 +23,8 @@ namespace HSPI_MelcloudClimate.ConfigPage
 		private const string _pageNameText = "General Config";
 
 		private const string LogLevelKey = "LogLevelKey";
-		private const string TriggerCheckIntervalKey = "TriggerCheckInterval";
+        private const string HeatPumpTypeKey = "HeatPumpTypeKey";
+        private const string TriggerCheckIntervalKey = "TriggerCheckInterval";
 		private const string UserNameKey = "UserNameKey";
 		private const string PasswordKey = "PasswordKey";
 
@@ -111,8 +112,11 @@ namespace HSPI_MelcloudClimate.ConfigPage
 			returnString.Append("  <tr class='tablerowodd'><td>Time between check of Melcloud (minutes:seconds):</td><td>" +
 								SetMelCloudTimeCheck() + "</td></tr>");
 
-			//Set log level
-			returnString.Append("  <tr class='tableroweven'><td>Log level:</td><td>" + SetLogLevelUserInterface() +
+            returnString.Append("  <tr class='tableroweven'><td>Type of Heat pump (Air to air, air to water):</td><td>" +
+                                SetHeatPumpType() + "</td></tr>");
+
+            //Set log level
+            returnString.Append("  <tr class='tablerowodd'><td>Log level:</td><td>" + SetLogLevelUserInterface() +
 								"</td></tr>");
 
 
@@ -139,6 +143,17 @@ namespace HSPI_MelcloudClimate.ConfigPage
 			return userNameTextBox.Build();
 		}
 
+        private string SetHeatPumpType()
+        {
+            var heatPumpTypeDropdown = new clsJQuery.jqDropList(HeatPumpTypeKey, _pageName, false);
+            heatPumpTypeDropdown.items = new List<Pair>()
+            {
+                new Pair() {Name = "Air to air", Value = "0",},
+                new Pair() {Name = "Air to water", Value = "1"}
+            };
+            heatPumpTypeDropdown.selectedItemIndex = _iniSettings.HeatPumpType;
+            return heatPumpTypeDropdown.Build();
+        }
 
 		private string SetMelCloudTimeCheck()
 		{
@@ -179,7 +194,10 @@ namespace HSPI_MelcloudClimate.ConfigPage
 					case LogLevelKey:
 						HandleLogLevelDropDown(configUnit, dicQueryString[configUnit]);
 						break;
-					default:
+					case HeatPumpTypeKey:
+                        HandleHeatPumpTypeDropDown(configUnit, dicQueryString[configUnit]);
+						break;
+                    default:
 						PostError("Unknown post back");
 						break;
 				}
@@ -198,7 +216,7 @@ namespace HSPI_MelcloudClimate.ConfigPage
 				HandleTriggerCheckIntervalChange(dicQueryString);
 			}
 
-			return base.postBackProc(page, data, user, userRights);
+            return base.postBackProc(page, data, user, userRights);
 		}
 
 		private void HandleLogLevelDropDown(string configUnit, string chosenNumber)
@@ -207,7 +225,13 @@ namespace HSPI_MelcloudClimate.ConfigPage
 			_iniSettings.LogLevel = logLevel;
 		}
 
-		private void HandleTriggerCheckIntervalChange(Dictionary<string, string> dicQueryString)
+        private void HandleHeatPumpTypeDropDown(string configUnit, string chosenNumber)
+        {
+            var heatPumpType = int.Parse(chosenNumber);
+            _iniSettings.HeatPumpType = heatPumpType;
+        }
+
+        private void HandleTriggerCheckIntervalChange(Dictionary<string, string> dicQueryString)
 		{
 			var timeString = dicQueryString[TriggerCheckIntervalKey];
 			var timespan = GetTimespanFromTimeString(timeString);

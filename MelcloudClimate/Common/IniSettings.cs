@@ -12,7 +12,10 @@ namespace HSPI_MelcloudClimate.Common
 		void LoadSettingsFromIniFile();
 
 		LogLevel LogLevel { get; set; }
-		int CheckMelCloudTimerInterval { get; set; }
+
+		int HeatPumpType { get; set; }
+
+        int CheckMelCloudTimerInterval { get; set; }
 
 		string UserNameMelCloud { get; set; }
 		string PasswordMelCloud { get; set; }
@@ -34,7 +37,8 @@ namespace HSPI_MelcloudClimate.Common
 		private readonly string ConfigSection = "Config";
 		public const string LogLevelKey = "LogLevel";
 		public const string CheckMelCloudIntervalKey = "CheckMelcloudInterval";
-		public const string TestFileLocationKey = "TestFile";
+        public const string HeatPumpTypeKey = "HeatPumpType";
+        public const string TestFileLocationKey = "TestFile";
 		public const string UseTestFileKey = "UseTestFile";
 		private readonly IHSApplication _hs;
 
@@ -45,7 +49,8 @@ namespace HSPI_MelcloudClimate.Common
 		private string _msAppId;
 		private string _userName;
 		private string _password;
-		private const int DefaultTriggerTimeInterval = 120;
+        private int _heatPumpType;
+        private const int DefaultTriggerTimeInterval = 120;
 
 
 		public IniSettings(IHSApplication hs)
@@ -99,7 +104,17 @@ namespace HSPI_MelcloudClimate.Common
 			return false;
 		}
 
-		public int CheckMelCloudTimerInterval
+        public int HeatPumpType
+        {
+            get => _heatPumpType;
+            set
+            {
+                _heatPumpType = value;
+                SaveHeatPumpTypeToIni();
+            }
+        }
+
+        public int CheckMelCloudTimerInterval
 		{
 			get => _checkTriggerTimerInterval;
 			set
@@ -131,15 +146,17 @@ namespace HSPI_MelcloudClimate.Common
 			_userName = LoadUserName();
 			_password = LoadPassword();
 			_checkTriggerTimerInterval = LoadCheckTriggerTimerInterval();
-		}
+            _heatPumpType = LoadHeatPumpType();
+
+        }
 
 		private int LoadCheckTriggerTimerInterval()
 		{
 			var checkTriggerTimerIntervalString = _hs.GetINISetting(ConfigSection, CheckMelCloudIntervalKey, "", Utility.IniFile);
-			if (int.TryParse(checkTriggerTimerIntervalString, out var tempInterval))
+			if (int.TryParse(checkTriggerTimerIntervalString, out var triggerInterval))
 			{
-				if (tempInterval > 0)
-					return tempInterval;
+				if (triggerInterval > 0)
+					return triggerInterval;
 			}
 			//return tempInterval;
 			return DefaultTriggerTimeInterval;
@@ -150,7 +167,27 @@ namespace HSPI_MelcloudClimate.Common
 			_hs.SaveINISetting(ConfigSection, CheckMelCloudIntervalKey, _checkTriggerTimerInterval.ToString(), Utility.IniFile);
 		}
 
-		private string LoadUserName()
+        private int LoadHeatPumpType()
+        {
+            var heatPumpTypeAsString = _hs.GetINISetting(ConfigSection, HeatPumpTypeKey, "0", Utility.IniFile);
+            if (int.TryParse(heatPumpTypeAsString, out var heatPumpTypeAsInt))
+            {
+                if (heatPumpTypeAsInt > -1)
+                {
+                    _heatPumpType = heatPumpTypeAsInt;
+                    return heatPumpTypeAsInt;
+                }
+                    
+            }
+            return 0;//Default to Air to air
+        }
+
+        private void SaveHeatPumpTypeToIni()
+        {
+            _hs.SaveINISetting(ConfigSection, HeatPumpTypeKey, _heatPumpType.ToString(), Utility.IniFile);
+        }
+
+        private string LoadUserName()
 		{
 			_userName = _hs.GetINISetting(UserSection, UserNameKey, "", Utility.IniFile);
 			return _userName;
