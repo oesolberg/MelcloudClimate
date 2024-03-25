@@ -35,8 +35,8 @@
         "Postcode": "****",
         "PropertyType": 1,
         "QuantizedCoordinates": {
-            "Latitude": 51.675,
-            "Longitude": -0.7
+            "Latitude": 1,
+            "Longitude": 1
         },
         "Structure": {
             "Areas": [
