@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net;
+using HSPI_MelcloudClimate.Common;
 using HSPI_MelcloudClimate.Libraries.Logs;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -26,18 +27,21 @@ namespace HSPI_MelcloudClimate.Handlers
 	{
 		private readonly RestClient _client = new RestClient("https://app.melcloud.com/Mitsubishi.Wifi.Client/");
 		private readonly ILog _log;
-		private readonly string ClientLogin = "Login/ClientLogin";
+        private readonly IIniSettings _iniSettings;
+        private readonly string ClientLogin = "Login/ClientLogin";
 		private readonly string DeviceGet = "Device/Get";
 		private readonly string DeviceSetAta = "Device/SetAta";
-		private readonly string UserListDevices = "User/ListDevices";
+        private readonly string DeviceSetAtw = "Device/SetAtw";
+        private readonly string UserListDevices = "User/ListDevices";
 		private string _contextKey;
 		private int _httpStatusCode;
 		private bool _isLoggedIn;
 
-		public RestHandler(ILog log)
-		{
-			_log = log;
-		}
+		public RestHandler(ILog log,IIniSettings iniSettings)
+        {
+            _log = log;
+            _iniSettings = iniSettings;
+        }
 
 		public bool IsLoggedIn => _isLoggedIn;
 
@@ -116,7 +120,10 @@ namespace HSPI_MelcloudClimate.Handlers
 		{
 			var result = new RestHandlerResult(_log);
 			var request = RequestBasis(DeviceSetAta);
-			request.AddJsonBody(jsonObject);
+            if (_iniSettings.HeatPumpType == 1)
+                request = RequestBasis(DeviceSetAtw);
+
+            request.AddJsonBody(jsonObject);
 
 			try
 			{
@@ -143,6 +150,8 @@ namespace HSPI_MelcloudClimate.Handlers
 			try
 			{
 				result.Response = _client.Execute(request);
+				_log.Debug("Result of DoDeviceGet");
+				_log.Debug(result.ResponseContent);
 			}
 			catch (Exception e)
 			{

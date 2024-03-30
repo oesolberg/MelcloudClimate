@@ -8,6 +8,7 @@ using HSPI_MelcloudClimate.Libraries.Devices;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using HomeSeerAPI;
 using HSPI_MelcloudClimate.Common;
@@ -16,6 +17,13 @@ using HSPI_MelcloudClimate.Handlers;
 using HSPI_MelcloudClimate.Libraries;
 using HSPI_MelcloudClimate.Libraries.Logs;
 using HSPI_MelcloudClimate.Libraries.Settings;
+using System.Dynamic;
+using System.Linq;
+using System.Runtime;
+using System.Web.UI;
+
+//Api stuff https://github.com/vilppuvuorinen/pymelcloud/blob/master/pymelcloud/atw_device.py
+//https://github.com/vilppuvuorinen/pymelcloud/tree/master/pymelcloud
 
 namespace HSPI_MelcloudClimate
 {
@@ -38,6 +46,7 @@ namespace HSPI_MelcloudClimate
         private DateTime _nextCommunication;
         private int _notConnectedAttempts;
         private int _connectedTimes;
+        private int _runGetDevices;
         private Thread _thread;
 
         protected override string GetName()
@@ -123,7 +132,7 @@ namespace HSPI_MelcloudClimate
             _settings = new Setting(HS);
             _settings.DoIniFileTemplateIfFileMissing();
 
-            _restHandler = new RestHandler(_log);
+            _restHandler = new RestHandler(_log, _iniSettings);
 
             StartLoginAndDataFetchingInNewThread();
 
@@ -218,10 +227,12 @@ namespace HSPI_MelcloudClimate
             _log.Debug($"Setting timer with {_iniSettings.CheckMelCloudTimerInterval} seconds interval");
             if (_timer == null)
             {
+
                 _timer = new System.Timers.Timer();
                 _timer.Elapsed += OnTimedEvent;
                 _timer.AutoReset = true;
                 _timer.Enabled = true;
+                
             }
             _timer.Interval = _iniSettings.CheckMelCloudTimerIntervalInMilliseconds;
 
@@ -302,6 +313,15 @@ namespace HSPI_MelcloudClimate
                 return;
             }
 
+            _runGetDevices++;
+
+            //Update devices once in a while
+            if (_runGetDevices > 3 && _iniSettings.HeatPumpType == (int)HeatPumpType.Atw)
+            {
+                GetDevices();
+                _runGetDevices = 0;
+            }
+
             _connectedTimes++;
             if (_connectedTimes > 120)
             {
@@ -322,12 +342,14 @@ namespace HSPI_MelcloudClimate
             }
         }
 
+       
+
         private void TryReconnect()
         {
             StartLoginAndDataFetching();
         }
 
-        private void CreateMelcloudDevice(dynamic device)
+        private void CreateOrUpdateMelcloudDevice(dynamic device)
         {
             string deviceId = device.DeviceID.ToString();
 
@@ -343,42 +365,50 @@ namespace HSPI_MelcloudClimate
             }
 
 
-            double powerState = 0;
-            if (device.Power == true)
-                powerState = 1;
 
-            Device connectedRootDevice = new Device(HS)
-            {
-                Name = device.DeviceName,
-                Unique = deviceId
-            }
-            .AddPED(Constants.DeviceIdKey, deviceId)
-            .AddPED(Constants.TypeKey, Constants.Connection)
-            .CheckAndCreate()
-            .AddStatusGraphicField(0, -1, "images/MelcloudClimate/notConnected.png")
-            .AddStatusGraphicField(1, -1, "images/MelcloudClimate/Connected.png")
-            .SetText("Connected")
-            .SetValue(1);
+            Device connectedRootDevice = null;
 
             if (!_climateDevices[deviceId].ContainsKey(Constants.Connection))
-                _climateDevices[deviceId].Add(Constants.Connection, connectedRootDevice);
-
-            Device powerDevice = new Device(HS, connectedRootDevice)
             {
-                Name = "Power",
-                Unique = deviceId
+                connectedRootDevice = new Device(HS)
+                    {
+                        Name = device.DeviceName,
+                        Unique = deviceId
+                    }
+                    .AddPED(Constants.DeviceIdKey, deviceId)
+                    .AddPED(Constants.TypeKey, Constants.Connection)
+                    .CheckAndCreate()
+                    .AddStatusGraphicField(0, -1, "images/MelcloudClimate/notConnected.png")
+                    .AddStatusGraphicField(1, -1, "images/MelcloudClimate/Connected.png")
+                    .SetText("Connected")
+                    .SetValue(1);
 
+                _climateDevices[deviceId].Add(Constants.Connection, connectedRootDevice);
             }
-            .AddPED("DeviceIdKey", deviceId)
-            .AddPED("Type", "State")
 
-            .CheckAndCreate(powerState)
-            .AddButton(1, "On", $"images/HomeSeer/contemporary/on.gif")
-            .AddButton(0, "Off", $"images/HomeSeer/contemporary/off.gif");
 
+            
 
             if (!_climateDevices[deviceId].ContainsKey(Constants.PowerDevice))
+            {
+                double powerState = 0;
+                if (device.Power == true)
+                    powerState = 1;
+                Device powerDevice = new Device(HS, connectedRootDevice)
+                    {
+                        Name = "Power",
+                        Unique = deviceId
+
+                    }
+                    .AddPED("DeviceIdKey", deviceId)
+                    .AddPED("Type", "State")
+
+                    .CheckAndCreate(powerState)
+                    .AddButton(1, "On", $"images/HomeSeer/contemporary/on.gif")
+                    .AddButton(0, "Off", $"images/HomeSeer/contemporary/off.gif");
+
                 _climateDevices[deviceId].Add(Constants.PowerDevice, powerDevice);
+            }
 
             //Set the device to the modus picked up
 
@@ -389,177 +419,568 @@ namespace HSPI_MelcloudClimate
             _log.Debug("Heat pump type(0=ATA,1=ATW): " + device.Device.DeviceType);
             double roomTemperature = 20;
 
-
-            if ((int)device.Device.DeviceType == 0)
-            {
-                roomTemperature = (double)device.Device.RoomTemperature;
-            }
-            // If Air to Water
-            if ((int)device.Device.DeviceType == 1)
-            {
-                roomTemperature = (double)device.Device.RoomTemperatureZone1;
-            }
-
-            _log.Debug("Adding current temperature");
-            Device currentTemperatureDevice = new Device(HS, connectedRootDevice)
-            {
-                Name = "Current Temperature",
-                Unique = deviceId
-
-            }
-            .AddPED("DeviceIdKey", deviceId)
-            .AddPED("Type", "Current")
-            .CheckAndCreate(roomTemperature)
-            .AddStatusControlRangeField(0, 50, " " + (char)176 + "C", true, $"images/HomeSeer/contemporary/Thermometer-110.png");
-
-
             if (!_climateDevices[deviceId].ContainsKey(Constants.CurrentTemperatureDevice))
+            {
+                if ((int)device.Device.DeviceType == 0)
+                {
+                    roomTemperature = (double)device.Device.RoomTemperature;
+                }
+                // If Air to Water
+                if ((int)device.Device.DeviceType == 1)
+                {
+                    roomTemperature = (double)device.Device.RoomTemperatureZone1;
+                }
+
+
+                _log.Debug("Adding current temperature");
+                Device currentTemperatureDevice = new Device(HS, connectedRootDevice)
+                    {
+                        Name = "Current Temperature",
+                        Unique = deviceId
+
+                    }
+                    .AddPED("DeviceIdKey", deviceId)
+                    .AddPED("Type", "Current")
+                    .CheckAndCreate(roomTemperature)
+                    .AddStatusControlRangeField(0, 50, " " + (char)176 + "C", true, $"images/HomeSeer/contemporary/Thermometer-110.png");
+
                 _climateDevices[deviceId].Add(Constants.CurrentTemperatureDevice, currentTemperatureDevice);
-
-
-            _log.Debug("Adding set temperature");
-            double setTemperature = 20;
-            if ((int)device.Device.DeviceType == 0)
-            {
-                setTemperature = (double)device.Device.SetTemperature;
-            }
-            // If Air to Water
-            if ((int)device.Device.DeviceType == 1)
-            {
-                setTemperature = (double)device.Device.SetTemperatureZone1;
             }
 
 
-            Device setpointTemperatureDevice = new Device(HS, connectedRootDevice)
-            {
-                Name = "Temperature Setpoint",
-                Unique = deviceId
-
-            }
-            .AddPED("DeviceIdKey", deviceId)
-            .AddPED("Type", "Target")
-            .CheckAndCreate(setTemperature)
-                    .AddDropdown(5, 35, " " + (char)176 + "C", $"images/HomeSeer/contemporary/Thermometer-110.png");
-
-            //Get current setpoint
-            JsonCommand[deviceId].SetTemperature = device.Device.SetTemperature;
 
             if (!_climateDevices[deviceId].ContainsKey(Constants.SetpointTemperatureDevice))
+            {
+
+                _log.Debug("Adding set temperature");
+                double setTemperature = 20;
+                if ((int)device.Device.DeviceType == 0)
+                {
+                    setTemperature = (double)device.Device.SetTemperature;
+                }
+                // If Air to Water
+                if ((int)device.Device.DeviceType == 1)
+                {
+                    setTemperature = (double)device.Device.SetTemperatureZone1;
+                }
+
+                Device setpointTemperatureDevice = new Device(HS, connectedRootDevice)
+                    {
+                        Name = "Temperature Setpoint",
+                        Unique = deviceId
+
+                    }
+                    .AddPED("DeviceIdKey", deviceId)
+                    .AddPED("Type", "Target")
+                    .CheckAndCreate(setTemperature)
+                    .AddDropdown(5, 35, " " + (char)176 + "C", $"images/HomeSeer/contemporary/Thermometer-110.png");
+
+                //Get current setpoint
+                JsonCommand[deviceId].SetTemperature = device.Device.SetTemperature;
+
                 _climateDevices[deviceId].Add(Constants.SetpointTemperatureDevice, setpointTemperatureDevice);
+            }
 
             //OperationalModeDevice 
-            if ((int) device.Device.DeviceType == 1)
+            if ((int)device.Device.DeviceType == 1)
             {
-                CreateOperationalModeAirToWater(connectedRootDevice,device,deviceId);
+                CreateOperationalModeAirToWater(connectedRootDevice, device, deviceId);
             }
             else
             {
-                CreateOperationalModeAirToAir(connectedRootDevice,device,deviceId);
+                CreateOperationalModeAirToAir(connectedRootDevice, device, deviceId);
             }
-                
 
 
-            if ((int) device.Device.DeviceType == 0)
+
+            if ((int)device.Device.DeviceType == 0)
             {
-                CreateFanSpeed(connectedRootDevice,device, deviceId);
+                CreateFanSpeed(connectedRootDevice, device, deviceId);
                 //Add vanes?
                 _log.Debug("Adding vanes if exists");
                 CreateHorizontalVane(connectedRootDevice, device, deviceId);
                 CreateVerticalVane(connectedRootDevice, device, deviceId);
             }
+
+            if ((int)device.Device.DeviceType == 1)
+            {
+                CreateAdditionalAirToWaterDevices(connectedRootDevice, device, deviceId);
+            }
         }
+
+        private const string OutdoorTemperature = "OutdoorTemperature";
+        private const string FlowTemperature = "FlowTemperature";
+        private const string ReturnTemperature = "ReturnTemperature";
+        private const string FlowTemperatureZone1 = "FlowTemperatureZone1";
+        private const string FlowTemperatureBoiler = "FlowTemperatureBoiler";
+        private const string TankWaterTemperature = "TankWaterTemperature";
+        private const string DailyHeatingEnergyConsumed = "DailyHeatingEnergyConsumed";
+        private const string DailyHotWaterEnergyConsumed = "DailyHotWaterEnergyConsumed";
+        private const string DailyHeatingEnergyProduced = "DailyHeatingEnergyProduced";
+        private const string DailyHotWaterEnergyProduced = "DailyHotWaterEnergyProduced";
+        private const string HasErrorMessages = "HasErrorMessages";
+
+        private void CreateAdditionalAirToWaterDevices(Device connectedRootDevice, dynamic device, string deviceId)
+        {
+
+            //outdoor temperature - decimal
+
+            CreateOutdoorTemperatureDevice(connectedRootDevice, device, deviceId);
+
+
+            //FlowTemperature- decimal
+
+            CreateFlowTemperatureDevice(connectedRootDevice, device, deviceId);
+
+
+            //    ReturnTemperature- decimal
+
+            CreateReturnTemperatureDevice(connectedRootDevice, device, deviceId);
+
+
+            //FlowTemperatureZone1- decimal
+
+            CreateFlowTemperatureZone1Device(connectedRootDevice, device, deviceId);
+
+
+            //    FlowTemperatureBoiler- decimal
+
+            CreateFlowTemperatureBoilerDevice(connectedRootDevice, device, deviceId);
+
+
+            //BoilerStatus??
+            //    TankWaterTemperature
+
+            CreateTankWaterTemperatureDevice(connectedRootDevice, device, deviceId);
+
+
+            //DailyHeatingEnergyConsumed
+
+            CreateDailyHeatingEnergyConsumedDevice(connectedRootDevice, device, deviceId);
+
+
+            //    DailyHotWaterEnergyConsumed
+
+            CreateDailyHotWaterEnergyConsumedDevice(connectedRootDevice, device, deviceId);
+
+
+            //DailyHeatingEnergyProduced
+
+            CreateDailyHeatingEnergyProducedDevice(connectedRootDevice, device, deviceId);
+
+
+            // DailyHotWaterEnergyProduced
+
+            CreateDailyHotWaterEnergyProducedDevice(connectedRootDevice, device, deviceId);
+            
+            ////HasErrorMessages
+            //if (DeviceExists(device, HasErrorMessages))
+            //{
+            //    var currentStatus = (bool)device.Device.HasErrorMessages;
+
+            //    Device hasErrorMessages = new Device(HS, connectedRootDevice)
+            //        {
+            //            Name = "Has Error Messages",
+            //            Unique = deviceId
+
+            //        }
+            //        .AddPED("DeviceIdKey", deviceId)
+            //        .AddPED("Type", "HasErrorMessages")
+            //        .CheckAndCreate(currentStatus)
+            //        .AddButton(1, "On", $"images/HomeSeer/contemporary/on.gif")
+            //        .AddButton(0, "Off", $"images/HomeSeer/contemporary/off.gif");
+
+            //    if (!_climateDevices[deviceId].ContainsKey(Constants.HasErrorMessages))
+            //        _climateDevices[deviceId].Add(Constants.HasErrorMessages, hasErrorMessages);
+
+
+            //}
+        }
+
+        private void CreateDailyHotWaterEnergyProducedDevice(Device connectedRootDevice, dynamic device, string deviceId)
+        {
+            if (!_climateDevices[deviceId].ContainsKey(Constants.DailyHotWaterEnergyProduced))
+            {
+                var currentEnergy = (double)device.Device.DailyHotWaterEnergyProduced;
+
+                Device currentEnergyDevice = new Device(HS, connectedRootDevice)
+                    {
+                        Name = "Daily Hot Water Energy Produced",
+                        Unique = deviceId
+
+                    }
+                    .AddPED("DeviceIdKey", deviceId)
+                    .AddPED("Type", "DailyHotWaterEnergyProduced")
+                    .CheckAndCreate(currentEnergy)
+                    .AddStatusControlRangeField(0, 50, "", true);
+
+
+                _climateDevices[deviceId].Add(Constants.DailyHotWaterEnergyProduced, currentEnergyDevice);
+            }
+
+            if (device.Device.ContainsKey("DailyHotWaterEnergyProduced") && _climateDevices[deviceId].ContainsKey(Constants.DailyHotWaterEnergyProduced))
+            {
+                _climateDevices[deviceId][Constants.DailyHotWaterEnergyProduced]
+                    .SetValue((double)device.Device["DailyHotWaterEnergyProduced"]);
+            }
+        }
+
+        private void CreateDailyHeatingEnergyProducedDevice(Device connectedRootDevice, dynamic device, string deviceId)
+        {
+       
+            if (!_climateDevices[deviceId].ContainsKey(Constants.DailyHeatingEnergyProduced))
+            {
+                var currentTemperature = (double)device.Device.DailyHeatingEnergyProduced;
+
+                Device currentEnergyDevice = new Device(HS, connectedRootDevice)
+                    {
+                        Name = "Daily Heating Energy Produced",
+                        Unique = deviceId
+
+                    }
+                    .AddPED("DeviceIdKey", deviceId)
+                    .AddPED("Type", "DailyHeatingEnergyProduced")
+                    .CheckAndCreate(currentTemperature)
+                    .AddStatusControlRangeField(0, 50, "", true);
+
+                _climateDevices[deviceId].Add(Constants.DailyHeatingEnergyProduced, currentEnergyDevice);
+            }
+
+
+
+            if (device.Device.ContainsKey("DailyHeatingEnergyProduced") && _climateDevices[deviceId].ContainsKey(Constants.DailyHeatingEnergyProduced))
+            {
+                _climateDevices[deviceId][Constants.DailyHeatingEnergyProduced]
+                    .SetValue((double)device.Device["DailyHeatingEnergyProduced"]);
+            }
+
+        }
+
+        private void CreateDailyHotWaterEnergyConsumedDevice(Device connectedRootDevice, dynamic device, string deviceId)
+        {
+
+            if (!_climateDevices[deviceId].ContainsKey(Constants.DailyHotWaterEnergyConsumed))
+            {
+                var currentEnergy = (double)device.Device.DailyHotWaterEnergyConsumed;
+
+                Device currentEnergyDevice = new Device(HS, connectedRootDevice)
+                    {
+                        Name = "Daily Hot Water Energy Consumed",
+                        Unique = deviceId
+
+                    }
+                    .AddPED("DeviceIdKey", deviceId)
+                    .AddPED("Type", "DailyHotWaterEnergyConsumed")
+                    .CheckAndCreate(currentEnergy)
+                    .AddStatusControlRangeField(0, 50, "", true);
+                _climateDevices[deviceId].Add(Constants.DailyHotWaterEnergyConsumed, currentEnergyDevice);
+            }
+
+            if (device.Device.ContainsKey("DailyHotWaterEnergyConsumed") && _climateDevices[deviceId].ContainsKey(Constants.DailyHotWaterEnergyConsumed))
+            {
+                _climateDevices[deviceId][Constants.DailyHotWaterEnergyConsumed]
+                    .SetValue((double)device.Device["DailyHotWaterEnergyConsumed"]);
+            }
+        }
+
+        private void CreateDailyHeatingEnergyConsumedDevice(Device connectedRootDevice, dynamic device, string deviceId)
+        {
+
+            var currentEnergyDevice = (double)device.Device.DailyHeatingEnergyConsumed;
+
+            if (!_climateDevices[deviceId].ContainsKey(Constants.DailyHeatingEnergyConsumed))
+            {
+
+                Device currentTemperatureDevice = new Device(HS, connectedRootDevice)
+                    {
+                        Name = "Daily Heating Energy Consumed",
+                        Unique = deviceId
+
+                    }
+                    .AddPED("DeviceIdKey", deviceId)
+                    .AddPED("Type", "DailyHeatingEnergyConsumed")
+                    .CheckAndCreate(currentEnergyDevice)
+                    .AddStatusControlRangeField(0, 50, "", true);
+
+                _climateDevices[deviceId].Add(Constants.DailyHeatingEnergyConsumed, currentTemperatureDevice);
+            }
+
+            if (device.Device.ContainsKey("DailyHeatingEnergyConsumed") && _climateDevices[deviceId].ContainsKey(Constants.DailyHeatingEnergyConsumed))
+            {
+                _climateDevices[deviceId][Constants.DailyHeatingEnergyConsumed]
+                    .SetValue((double)device.Device["DailyHeatingEnergyConsumed"]);
+            }
+        }
+
+        private void CreateTankWaterTemperatureDevice(Device connectedRootDevice, dynamic device, string deviceId)
+        {
+            var currentTemperature = (double)device.Device.TankWaterTemperature;
+
+          
+            if (!_climateDevices[deviceId].ContainsKey(Constants.TankWaterTemperature))
+            {
+                Device currentTemperatureDevice = new Device(HS, connectedRootDevice)
+                    {
+                        Name = "Tank Water Temperature",
+                        Unique = deviceId
+
+                    }
+                    .AddPED("DeviceIdKey", deviceId)
+                    .AddPED("Type", "TankWaterTemperature")
+                    .CheckAndCreate(currentTemperature)
+                    .AddStatusControlRangeField(0, 50, " " + (char)176 + "C", true,
+                        $"images/HomeSeer/contemporary/Thermometer-110.png");
+                _climateDevices[deviceId].Add(Constants.TankWaterTemperature, currentTemperatureDevice);
+            }
+
+            if (device.Device.ContainsKey("TankWaterTemperature") && _climateDevices[deviceId].ContainsKey(Constants.TankWaterTemperature))
+            {
+                _climateDevices[deviceId][Constants.TankWaterTemperature]
+                    .SetValue((double)device.Device["TankWaterTemperature"]);
+            }
+        }
+
+        private void CreateFlowTemperatureBoilerDevice(Device connectedRootDevice, dynamic device, string deviceId)
+        {
+            var currentTemperature = (double)device.Device.FlowTemperatureBoiler;
+
+
+            if (!_climateDevices[deviceId].ContainsKey(Constants.ReturnTemperature))
+            {
+                Device currentTemperatureDevice = new Device(HS, connectedRootDevice)
+                    {
+                        Name = "Flow Temperature Boiler",
+                        Unique = deviceId
+
+                    }
+                    .AddPED("DeviceIdKey", deviceId)
+                    .AddPED("Type", "FlowTemperatureBoiler")
+                    .CheckAndCreate(currentTemperature)
+                    .AddStatusControlRangeField(0, 50, " " + (char)176 + "C", true,
+                        $"images/HomeSeer/contemporary/Thermometer-110.png");
+                _climateDevices[deviceId].Add(Constants.ReturnTemperature, currentTemperatureDevice);
+            }
+
+            if (device.Device.ContainsKey("FlowTemperatureBoiler") && _climateDevices[deviceId].ContainsKey(Constants.FlowTemperatureBoiler))
+            {
+                _climateDevices[deviceId][Constants.FlowTemperatureBoiler]
+                    .SetValue((double)device.Device["FlowTemperatureBoiler"]);
+            }
+        }
+
+        private void CreateFlowTemperatureZone1Device(Device connectedRootDevice, dynamic device, string deviceId)
+        {
+            var currentTemperature = (double)device.Device.FlowTemperatureZone1;
+
+
+            if (!_climateDevices[deviceId].ContainsKey(Constants.ReturnTemperature))
+            {
+                Device currentTemperatureDevice = new Device(HS, connectedRootDevice)
+                    {
+                        Name = "Flow Temperature Zone1",
+                        Unique = deviceId
+
+                    }
+                    .AddPED("DeviceIdKey", deviceId)
+                    .AddPED("Type", "FlowTemperatureZone1")
+                    .CheckAndCreate(currentTemperature)
+                    .AddStatusControlRangeField(0, 50, " " + (char)176 + "C", true,
+                        $"images/HomeSeer/contemporary/Thermometer-110.png");
+                _climateDevices[deviceId].Add(Constants.ReturnTemperature, currentTemperatureDevice);
+            }
+
+
+            if (device.Device.ContainsKey("FlowTemperatureZone1") && _climateDevices[deviceId].ContainsKey(Constants.FlowTemperatureZone1))
+            {
+                _climateDevices[deviceId][Constants.FlowTemperatureZone1]
+                    .SetValue((double)device.Device["FlowTemperatureZone1"]);
+            }
+
+        }
+
+        private void CreateReturnTemperatureDevice(Device connectedRootDevice, dynamic device, string deviceId)
+        {
+            var currentTemperature = (double)device.Device.ReturnTemperature;
+            
+            if (!_climateDevices[deviceId].ContainsKey(Constants.ReturnTemperature))
+            {
+                Device currentTemperatureDevice = new Device(HS, connectedRootDevice)
+                    {
+                        Name = "Return Temperature",
+                        Unique = deviceId
+
+                    }
+                    .AddPED("DeviceIdKey", deviceId)
+                    .AddPED("Type", "ReturnTemperature")
+                    .CheckAndCreate(currentTemperature)
+                    .AddStatusControlRangeField(0, 50, " " + (char)176 + "C", true,
+                        $"images/HomeSeer/contemporary/Thermometer-110.png");
+
+                _climateDevices[deviceId].Add(Constants.ReturnTemperature, currentTemperatureDevice);
+            }
+
+            if (device.Device.ContainsKey("ReturnTemperature") && _climateDevices[deviceId].ContainsKey(Constants.ReturnTemperature))
+            {
+                _climateDevices[deviceId][Constants.ReturnTemperature]
+                    .SetValue((double)device.Device["ReturnTemperature"]);
+            }
+        }
+
+        private void CreateFlowTemperatureDevice(Device connectedRootDevice, dynamic device, string deviceId)
+        {
+            var currentFlowTemperature = (double)device.Device.FlowTemperature;
+
+
+            if (!_climateDevices[deviceId].ContainsKey(Constants.OutdoorTemperature))
+            {
+                Device outdoorTemperatureDevice = new Device(HS, connectedRootDevice)
+                    {
+                        Name = "Flow Temperature",
+                        Unique = deviceId
+
+                    }
+                    .AddPED("DeviceIdKey", deviceId)
+                    .AddPED("Type", "FlowTemperature")
+                    .CheckAndCreate(currentFlowTemperature)
+                    .AddStatusControlRangeField(0, 50, " " + (char)176 + "C", true,
+                        $"images/HomeSeer/contemporary/Thermometer-110.png");
+
+                _climateDevices[deviceId].Add(Constants.OutdoorTemperature, outdoorTemperatureDevice);
+            }
+
+            if (device.Device.ContainsKey("FlowTemperature") && _climateDevices[deviceId].ContainsKey(Constants.FlowTemperature))
+            {
+                _climateDevices[deviceId][Constants.FlowTemperature]
+                    .SetValue(currentFlowTemperature);
+            }
+        }
+
+        private void CreateOutdoorTemperatureDevice(Device connectedRootDevice, dynamic device, string deviceId)
+        {
+            var outdoorTemperature = (double)device.Device.OutdoorTemperature;
+            
+            if (!_climateDevices[deviceId].ContainsKey(Constants.OutdoorTemperature))
+            {
+                Device outdoorTemperatureDevice = new Device(HS, connectedRootDevice)
+                    {
+                        Name = "Outdoor Temperature",
+                        Unique = deviceId
+
+                    }
+                    .AddPED("DeviceIdKey", deviceId)
+                    .AddPED("Type", "OutdoorTemperature")
+                    .CheckAndCreate(outdoorTemperature)
+                    .AddStatusControlRangeField(0, 50, " " + (char)176 + "C", true,
+                        $"images/HomeSeer/contemporary/Thermometer-110.png");
+
+                _climateDevices[deviceId].Add(Constants.OutdoorTemperature, outdoorTemperatureDevice);
+            }
+        
+        }
+
 
         private void CreateOperationalModeAirToWater(Device connectedRootDevice, dynamic device, string deviceId)
         {
-            _log.Debug("Creating operationalMode Zone1 for air to water");
-            Device operationalModeDevice = new Device(HS, connectedRootDevice)
-                {
-                    Name = "Operational mode",
-                    Unique = deviceId
-
-                }
-                .AddPED("DeviceIdKey", deviceId)
-                .AddPED("Type", "OperationMode")
-                .CheckAndCreate((double)device.Device.OperationMode)
-                .AddButton(0, "Room")
-                .AddButton(1, "Flow" )
-                .AddButton(2, "Curve");
-
-            //Get current setpoint
-            JsonCommand[deviceId].OperationMode = device.Device.OperationMode;
-
             if (!_climateDevices[deviceId].ContainsKey(Constants.OperationalModeDevice))
+            {
+                _log.Debug("Creating operationalMode Zone1 for air to water");
+                Device operationalModeDevice = new Device(HS, connectedRootDevice)
+                    {
+                        Name = "Operational mode",
+                        Unique = deviceId
+
+                    }
+                    .AddPED("DeviceIdKey", deviceId)
+                    .AddPED("Type", "OperationMode")
+                    .CheckAndCreate((double)device.Device.OperationMode)
+                    .AddButton(0, "Room")
+                    .AddButton(1, "Flow")
+                    .AddButton(2, "Curve");
+
+                //Get current operation mode
+                JsonCommand[deviceId].OperationMode = device.Device.OperationMode;
+
                 _climateDevices[deviceId].Add(Constants.OperationalModeDevice, operationalModeDevice);
+            }
+
         }
 
         private void CreateOperationalModeAirToAir(Device connectedRootDevice, dynamic device, string deviceId)
         {
-            _log.Debug("Creating operationalMode for air to air");
-            Device operationalModeDevice = new Device(HS, connectedRootDevice)
-                {
-                    Name = "Operational mode",
-                    Unique = deviceId
-
-                }
-                .AddPED("DeviceIdKey", deviceId)
-                .AddPED("Type", "OperationMode")
-                .CheckAndCreate((double)device.Device.OperationMode)
-                .AddButton(1, "Heat", $"images/HomeSeer/contemporary/Heat.png")
-                .AddButton(2, "Dry", $"images/HomeSeer/contemporary/water.gif")
-                .AddButton(3, "Cool", $"images/HomeSeer/contemporary/Cool.png")
-                .AddButton(7, "Fan", $"images/HomeSeer/contemporary/fan-on.png")
-                .AddButton(8, "Auto", $"images/HomeSeer/contemporary/auto-mode.png");
-
-            //Get current setpoint
-            JsonCommand[deviceId].OperationMode = device.Device.OperationMode;
-
             if (!_climateDevices[deviceId].ContainsKey(Constants.OperationalModeDevice))
+            {
+                _log.Debug("Creating operationalMode for air to air");
+                Device operationalModeDevice = new Device(HS, connectedRootDevice)
+                    {
+                        Name = "Operational mode",
+                        Unique = deviceId
+
+                    }
+                    .AddPED("DeviceIdKey", deviceId)
+                    .AddPED("Type", "OperationMode")
+                    .CheckAndCreate((double)device.Device.OperationMode)
+                    .AddButton(1, "Heat", $"images/HomeSeer/contemporary/Heat.png")
+                    .AddButton(2, "Dry", $"images/HomeSeer/contemporary/water.gif")
+                    .AddButton(3, "Cool", $"images/HomeSeer/contemporary/Cool.png")
+                    .AddButton(7, "Fan", $"images/HomeSeer/contemporary/fan-on.png")
+                    .AddButton(8, "Auto", $"images/HomeSeer/contemporary/auto-mode.png");
+
+                //Get current setpoint
+                JsonCommand[deviceId].OperationMode = device.Device.OperationMode;
+
                 _climateDevices[deviceId].Add(Constants.OperationalModeDevice, operationalModeDevice);
+            }
         }
 
         private void CreateFanSpeed(Device connectedRootDevice, dynamic device, string deviceId)
         {
-            _log.Debug("Creating fan speed");
-            Device fanSpeedDevice = new Device(HS, connectedRootDevice)
-                {
-                    Name = "Fan speed",
-                    Unique = deviceId
-
-                }
-                .AddPED("DeviceIdKey", deviceId)
-                .AddPED("Type", Constants.FanSpeed)
-                .CheckAndCreate((double)device.Device.FanSpeed)
-                .AddFanSpeedButtons((int)device.Device.NumberOfFanSpeeds);
-
             if (!_climateDevices[deviceId].ContainsKey(Constants.FanSpeed))
+            {
+                _log.Debug("Creating fan speed");
+                Device fanSpeedDevice = new Device(HS, connectedRootDevice)
+                    {
+                        Name = "Fan speed",
+                        Unique = deviceId
+
+                    }
+                    .AddPED("DeviceIdKey", deviceId)
+                    .AddPED("Type", Constants.FanSpeed)
+                    .CheckAndCreate((double)device.Device.FanSpeed)
+                    .AddFanSpeedButtons((int)device.Device.NumberOfFanSpeeds);
+
                 _climateDevices[deviceId].Add(Constants.FanSpeed, fanSpeedDevice);
+            }
         }
 
         private void CreateHorizontalVane(Device connectedRootDevice, dynamic device, string deviceId)
         {
             if ((bool)device.Device.ModelSupportsVaneHorizontal)
             {
-                _log.Debug("Adding horizontal vane");
-                Device vaneHorizontalDevice = new Device(HS, connectedRootDevice)
-                    {
-                        Name = "Vane Horizontal",
-                        Unique = deviceId
-
-                    }
-                    .AddPED("DeviceIdKey", deviceId)
-                    .AddPED("Type", Constants.VaneHorizontal)
-                    .CheckAndCreate((double)device.Device.VaneHorizontalDirection)
-                    //1 | 2 | 3 | 4 | 5 | Swing | Auto - {1|2|3|4|5|12|0}
-                    .AddButton(12, "Swing", $"images/MelcloudClimate/HorizontalVaneSwing.png", 1, 1)
-                    .AddButton(0, "Auto", $"images/MelcloudClimate/Auto.png", 1, 2)
-                    .AddButton(1, "Pos 1", $"images/MelcloudClimate/HorizontalVane_1.png", 2, 1)
-                    .AddButton(2, "Pos 2", $"images/MelcloudClimate/HorizontalVane_2.png", 2, 2)
-                    .AddButton(3, "Pos 3", $"images/MelcloudClimate/HorizontalVane_3.png", 2, 3)
-                    .AddButton(4, "Pos 4", $"images/MelcloudClimate/HorizontalVane_4.png", 2, 4)
-                    .AddButton(5, "Pos 5", $"images/MelcloudClimate/HorizontalVane_5.png", 2, 5);
-
+                
                 if (!_climateDevices[deviceId].ContainsKey(Constants.VaneHorizontal))
+                {
+                    _log.Debug("Adding horizontal vane");
+                    Device vaneHorizontalDevice = new Device(HS, connectedRootDevice)
+                        {
+                            Name = "Vane Horizontal",
+                            Unique = deviceId
+
+                        }
+                        .AddPED("DeviceIdKey", deviceId)
+                        .AddPED("Type", Constants.VaneHorizontal)
+                        .CheckAndCreate((double)device.Device.VaneHorizontalDirection)
+                        //1 | 2 | 3 | 4 | 5 | Swing | Auto - {1|2|3|4|5|12|0}
+                        .AddButton(12, "Swing", $"images/MelcloudClimate/HorizontalVaneSwing.png", 1, 1)
+                        .AddButton(0, "Auto", $"images/MelcloudClimate/Auto.png", 1, 2)
+                        .AddButton(1, "Pos 1", $"images/MelcloudClimate/HorizontalVane_1.png", 2, 1)
+                        .AddButton(2, "Pos 2", $"images/MelcloudClimate/HorizontalVane_2.png", 2, 2)
+                        .AddButton(3, "Pos 3", $"images/MelcloudClimate/HorizontalVane_3.png", 2, 3)
+                        .AddButton(4, "Pos 4", $"images/MelcloudClimate/HorizontalVane_4.png", 2, 4)
+                        .AddButton(5, "Pos 5", $"images/MelcloudClimate/HorizontalVane_5.png", 2, 5);
+
+
                     _climateDevices[deviceId].Add(Constants.VaneHorizontal, vaneHorizontalDevice);
+                }
                 JsonCommand[deviceId].VaneHorizontal = device.Device.VaneHorizontal;
             }
         }
@@ -568,33 +989,37 @@ namespace HSPI_MelcloudClimate
         {
             if ((bool)device.Device.ModelSupportsVaneVertical)
             {
-                _log.Debug("Adding vertical vane");
-                Device vaneVerticalDevice = new Device(HS, connectedRootDevice)
-                    {
-                        Name = "Vane Vertical",
-                        Unique = deviceId
-
-                    }
-                    .AddPED("DeviceIdKey", deviceId)
-                    .AddPED("Type", Constants.VaneVertical)
-                    .CheckAndCreate((double)device.Device.VaneVerticalDirection)
-                    //1|2|3|4|5|Swing|Auto - {1|2|3|4|5|7|0}
-                    .AddButton(7, "Swing", $"images/MelcloudClimate/VerticalVaneSwing.png", 1, 1)
-                    .AddButton(0, "Auto", $"images/MelcloudClimate/Auto.png", 1, 2)
-                    .AddButton(1, "Pos 1", $"images/MelcloudClimate/VerticalVane_1.png", 2, 1)
-                    .AddButton(2, "Pos 2", $"images/MelcloudClimate/VerticalVane_2.png", 2, 2)
-                    .AddButton(3, "Pos 3", $"images/MelcloudClimate/VerticalVane_3.png", 2, 3)
-                    .AddButton(4, "Pos 4", $"images/MelcloudClimate/VerticalVane_4.png", 2, 4)
-                    .AddButton(5, "Pos 5", $"images/MelcloudClimate/VerticalVane_5.png", 2, 5);
-
+           
                 if (!_climateDevices[deviceId].ContainsKey(Constants.VaneVertical))
+                {
+                    _log.Debug("Adding vertical vane");
+                    Device vaneVerticalDevice = new Device(HS, connectedRootDevice)
+                        {
+                            Name = "Vane Vertical",
+                            Unique = deviceId
+
+                        }
+                        .AddPED("DeviceIdKey", deviceId)
+                        .AddPED("Type", Constants.VaneVertical)
+                        .CheckAndCreate((double)device.Device.VaneVerticalDirection)
+                        //1|2|3|4|5|Swing|Auto - {1|2|3|4|5|7|0}
+                        .AddButton(7, "Swing", $"images/MelcloudClimate/VerticalVaneSwing.png", 1, 1)
+                        .AddButton(0, "Auto", $"images/MelcloudClimate/Auto.png", 1, 2)
+                        .AddButton(1, "Pos 1", $"images/MelcloudClimate/VerticalVane_1.png", 2, 1)
+                        .AddButton(2, "Pos 2", $"images/MelcloudClimate/VerticalVane_2.png", 2, 2)
+                        .AddButton(3, "Pos 3", $"images/MelcloudClimate/VerticalVane_3.png", 2, 3)
+                        .AddButton(4, "Pos 4", $"images/MelcloudClimate/VerticalVane_4.png", 2, 4)
+                        .AddButton(5, "Pos 5", $"images/MelcloudClimate/VerticalVane_5.png", 2, 5);
+
+
                     _climateDevices[deviceId].Add(Constants.VaneVertical, vaneVerticalDevice);
+                }
 
                 JsonCommand[deviceId].VaneVertical = device.Device.VaneVertical;
             }
         }
 
-   
+
         private bool PowerOn(int deviceId)
         {
             JsonCommand[deviceId.ToString()].Power = true;
@@ -769,12 +1194,12 @@ namespace HSPI_MelcloudClimate
                         _climateDevices[pair.Key.ToString()][Constants.FanSpeed]
                             .SetValue((double)deviceResponse.SetFanSpeed);
                     }
-                    else if (JsonCommand[pair.Key.ToString()].ContainsKey("SetFanSpeed") == false)
-                    {
-                        JsonCommand[pair.Key.ToString()].SetFanSpeed = deviceResponse.SetFanSpeed;
-                        _climateDevices[pair.Key.ToString()][Constants.FanSpeed]
-                            .SetValue((double)deviceResponse.SetFanSpeed);
-                    }
+                    //else if (JsonCommand[pair.Key.ToString()].ContainsKey("SetFanSpeed") == false)
+                    //{
+                    //    JsonCommand[pair.Key.ToString()].SetFanSpeed = deviceResponse.SetFanSpeed;
+                    //    _climateDevices[pair.Key.ToString()][Constants.FanSpeed]
+                    //        .SetValue((double)deviceResponse.SetFanSpeed);
+                    //}
 
                     if (JsonCommand[pair.Key.ToString()].ContainsKey("OperationMode") &&
                         JsonCommand[pair.Key.ToString()].OperationMode != deviceResponse.OperationMode)
@@ -864,6 +1289,35 @@ namespace HSPI_MelcloudClimate
                         }
                     }
 
+                    //ATW devices
+                    //Current temperature=RoomTemperatureZone1
+                    if (deviceResponse.ContainsKey("RoomTemperatureZone1") && _climateDevices[pair.Key.ToString()].ContainsKey(Constants.CurrentTemperatureDevice))
+                    {
+                        _climateDevices[pair.Key.ToString()][Constants.CurrentTemperatureDevice]
+                            .SetValue((double)deviceResponse["RoomTemperatureZone1"]);
+                    }
+
+                    if (deviceResponse.ContainsKey("OutdoorTemperature") && _climateDevices[pair.Key.ToString()].ContainsKey(Constants.OutdoorTemperature))
+                    {
+                        _climateDevices[pair.Key.ToString()][Constants.OutdoorTemperature]
+                            .SetValue((double)deviceResponse["OutdoorTemperature"]);
+                    }
+
+                    //if (deviceResponse.ContainsKey("HasErrorMessages") && _climateDevices[pair.Key.ToString()].ContainsKey(Constants.HasErrorMessages))
+                    //{
+                    //    _climateDevices[pair.Key.ToString()][Constants.HasErrorMessages]
+                    //        .SetValue((bool)deviceResponse["HasErrorMessages"]);
+                    //}
+
+                    //if (JsonCommand[pair.Key.ToString()].ContainsKey("VaneVertical") &&
+                    //    JsonCommand[pair.Key.ToString()].VaneVertical != deviceResponse.VaneVertical)
+                    //{
+                    //    JsonCommand[pair.Key.ToString()].VaneVertical = deviceResponse.VaneVertical;
+                    //    _climateDevices[pair.Key.ToString()][Constants.VaneVertical]
+                    //        .SetValue((double)deviceResponse.VaneVertical);
+                    //}
+
+
                     if (JsonCommand[pair.Key.ToString()].ContainsKey(Constants.HasPendingCommand) &&
                         JsonCommand[pair.Key.ToString()].HasPendingCommand != deviceResponse.HasPendingCommand)
                         JsonCommand[pair.Key.ToString()].HasPendingCommand = false;
@@ -918,8 +1372,6 @@ namespace HSPI_MelcloudClimate
         {
             lock (LockObject)
             {
-
-
                 _log.Info("Fetching Devies from MelCloud");
 
                 if (retry > 1)
@@ -948,7 +1400,7 @@ namespace HSPI_MelcloudClimate
                                 for (int j = 0; j < data[0].Structure.Floors[i].Devices.Count; j++)
                                 {
                                     _log.Debug("A device detected");
-                                    CreateMelcloudDevice(data[0].Structure.Floors[i].Devices[j]);
+                                    CreateOrUpdateMelcloudDevice(data[0].Structure.Floors[i].Devices[j]);
                                 }
                             }
                         }
@@ -962,7 +1414,7 @@ namespace HSPI_MelcloudClimate
                             {
                                 for (int j = 0; j < data[0].Structure.Area[i].Devices.Count; j++)
                                 {
-                                    CreateMelcloudDevice(data[0].Structure.Area[i].Devices[j]);
+                                    CreateOrUpdateMelcloudDevice(data[0].Structure.Area[i].Devices[j]);
                                 }
                             }
                         }
@@ -976,7 +1428,7 @@ namespace HSPI_MelcloudClimate
                             {
                                 for (int j = 0; j < data[0].Structure.Clients[i].Devices.Count; j++)
                                 {
-                                    CreateMelcloudDevice(data[0].Structure.Clients[i].Devices[j]);
+                                    CreateOrUpdateMelcloudDevice(data[0].Structure.Clients[i].Devices[j]);
                                 }
                             }
                         }
@@ -994,14 +1446,14 @@ namespace HSPI_MelcloudClimate
                                 {
                                     for (int j = 0; j < data[0].Structure.Devices[i].Devices.Count; j++)
                                     {
-                                        CreateMelcloudDevice(data[0].Structure.Devices[i].Devices[j]);
+                                        CreateOrUpdateMelcloudDevice(data[0].Structure.Devices[i].Devices[j]);
                                     }
                                 }
                                 //Create if we have a single device
                                 if (data[0].Structure.Devices[i].Devices == null &&
                                     data[0].Structure.Devices[i].Device != null)
                                 {
-                                    CreateMelcloudDevice(data[0].Structure.Devices[i]);
+                                    CreateOrUpdateMelcloudDevice(data[0].Structure.Devices[i]);
                                 }
 
 
@@ -1059,6 +1511,11 @@ namespace HSPI_MelcloudClimate
         }
 
         ////// NOT USED (yet) ///////////////
+
+        #region NotUsed
+
+
+
 
         public override object PluginFunction(string functionName, object[] parameters)
         {
@@ -1294,5 +1751,12 @@ namespace HSPI_MelcloudClimate
         {
             return string.Empty;
         }
+        #endregion
+    }
+
+    internal enum HeatPumpType
+    {
+        Ata = 0,
+        Atw = 1
     }
 }

@@ -47,7 +47,7 @@ namespace HSPI_MelcloudClimate.Libraries.Logs
 			if (_seriLogger != null) return;
 			var logPath = Path.Combine(Utility.ExePath, "Logs");
 			if (!Directory.Exists(logPath)) Directory.CreateDirectory(logPath);
-			var logFile = Path.Combine(logPath, "GCalSeerDebug.log");
+			var logFile = Path.Combine(logPath, "MelcloudClimateDebug.log");
 			lock (_lockObject)
 			{
 				_seriLogger = new LoggerConfiguration()
